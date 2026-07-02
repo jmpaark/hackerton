@@ -97,6 +97,38 @@ fun referenceShares(insights: TeamInsights): List<Pair<Member, Int>> {
     return weights.map { (m, w) -> m to (w / total * 100).roundToInt() }
 }
 
+// ─── 마일스톤 상태 (미니 LMS) ───
+
+enum class MilestoneStatus { SUBMITTED, OVERDUE, DUE_SOON, UPCOMING }
+
+fun milestoneStatus(
+    milestone: Milestone,
+    teamId: String,
+    submissions: List<Submission>,
+    today: LocalDate
+): MilestoneStatus {
+    if (submissions.any { it.milestoneId == milestone.id && it.teamId == teamId }) {
+        return MilestoneStatus.SUBMITTED
+    }
+    val due = parseDateOrNull(milestone.dueDate) ?: return MilestoneStatus.UPCOMING
+    return when {
+        due.isBefore(today) -> MilestoneStatus.OVERDUE
+        !due.isAfter(today.plusDays(3)) -> MilestoneStatus.DUE_SOON
+        else -> MilestoneStatus.UPCOMING
+    }
+}
+
+/** "D-3" / "D-DAY" / "D+2" */
+fun dDayLabel(dueDate: String, today: LocalDate): String {
+    val due = parseDateOrNull(dueDate) ?: return ""
+    val diff = java.time.temporal.ChronoUnit.DAYS.between(today, due)
+    return when {
+        diff > 0 -> "D-$diff"
+        diff == 0L -> "D-DAY"
+        else -> "D+${-diff}"
+    }
+}
+
 /** 연속 기록 일수 — 오늘(또는 어제)부터 거슬러 올라가며 센다 */
 fun streakDays(logDates: Set<LocalDate>, today: LocalDate): Int {
     var day = if (today in logDates) today else today.minusDays(1)

@@ -26,7 +26,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +57,8 @@ fun CreateTeamScreen(vm: AppViewModel, onBack: () -> Unit, onCreated: (teamId: S
     var projectName by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var githubUrl by remember { mutableStateOf("") }
+    var courseId by remember { mutableStateOf("") }
+    val courses = vm.data.collectAsState().value.courses
     val members = remember {
         mutableStateListOf(
             mutableStateOf(MemberDraft(me, "팀장", ""))
@@ -99,6 +103,34 @@ fun CreateTeamScreen(vm: AppViewModel, onBack: () -> Unit, onCreated: (teamId: S
                 placeholder = { Text("https://github.com/팀/저장소") },
                 singleLine = true, modifier = Modifier.fillMaxWidth()
             )
+
+            if (courses.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Text("과목 (선택)", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("과목에 연결하면 마일스톤 일정이 자동으로 표시돼요", color = Slate, fontSize = 12.sp)
+                courses.forEach { c ->
+                    val selected = courseId == c.id
+                    Card(
+                        modifier = Modifier.fillMaxWidth().clickable { courseId = if (selected) "" else c.id },
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surface
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = if (selected) 0.dp else 1.dp)
+                    ) {
+                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    c.name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                                Text("${c.semester} · ${c.type}", fontSize = 12.sp, color = Slate)
+                            }
+                            if (selected) Text("✓", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
 
             Spacer(Modifier.height(4.dp))
             Text("팀원 및 역할", fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -165,6 +197,7 @@ fun CreateTeamScreen(vm: AppViewModel, onBack: () -> Unit, onCreated: (teamId: S
                         description = description.trim(),
                         githubUrl = githubUrl.trim(),
                         createdByName = me,
+                        courseId = courseId,
                         members = members.map { s ->
                             Member(
                                 id = AppRepository.newId(),

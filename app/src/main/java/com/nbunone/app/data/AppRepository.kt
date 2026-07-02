@@ -118,6 +118,45 @@ object AppRepository {
         d.copy(teams = d.teams.map { if (it.id == teamId) it.copy(githubUrl = url) else it })
     }
 
+    // ─── 과목 / 마일스톤 / 제출 (미니 LMS) ───
+
+    fun addCourse(course: Course, milestones: List<Milestone>) = update {
+        it.copy(courses = it.courses + course, milestones = it.milestones + milestones)
+    }
+
+    fun deleteCourse(courseId: String) = update { d ->
+        d.copy(
+            courses = d.courses.filterNot { it.id == courseId },
+            milestones = d.milestones.filterNot { it.courseId == courseId },
+            teams = d.teams.map { if (it.courseId == courseId) it.copy(courseId = "") else it }
+        )
+    }
+
+    fun addMilestone(milestone: Milestone) = update { it.copy(milestones = it.milestones + milestone) }
+
+    fun deleteMilestone(milestoneId: String) = update { d ->
+        d.copy(
+            milestones = d.milestones.filterNot { it.id == milestoneId },
+            submissions = d.submissions.filterNot { it.milestoneId == milestoneId }
+        )
+    }
+
+    fun setTeamCourse(teamId: String, courseId: String) = update { d ->
+        d.copy(teams = d.teams.map { if (it.id == teamId) it.copy(courseId = courseId) else it })
+    }
+
+    fun addSubmission(submission: Submission) = update { d ->
+        // 팀당 마일스톤 1건 — 재제출 시 교체
+        val remaining = d.submissions.filterNot {
+            it.milestoneId == submission.milestoneId && it.teamId == submission.teamId
+        }
+        d.copy(submissions = remaining + submission)
+    }
+
+    fun deleteSubmission(submissionId: String) = update { d ->
+        d.copy(submissions = d.submissions.filterNot { it.id == submissionId })
+    }
+
     fun addSurvey(survey: Survey) = update { it.copy(surveys = it.surveys + survey) }
 
     fun deleteSurvey(surveyId: String) = update { d ->

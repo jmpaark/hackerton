@@ -7,7 +7,14 @@ import com.nbunone.app.data.PeerEval
 import com.nbunone.app.data.Seed
 import com.nbunone.app.data.Team
 import com.nbunone.app.data.computeInsights
+import com.nbunone.app.data.COURSE_TYPES
+import com.nbunone.app.data.Milestone
+import com.nbunone.app.data.MilestoneStatus
+import com.nbunone.app.data.Submission
+import com.nbunone.app.data.dDayLabel
 import com.nbunone.app.data.healthScore
+import com.nbunone.app.data.milestoneStatus
+import com.nbunone.app.data.milestoneTemplate
 import com.nbunone.app.data.referenceShares
 import com.nbunone.app.data.streakDays
 import org.junit.Assert.assertEquals
@@ -145,6 +152,43 @@ class InsightsTest {
     }
 
     @Test
+    fun `마일스톤 상태와 D-day 계산`() {
+        val today = LocalDate.of(2026, 7, 2)
+        val ms = Milestone("m1", "c1", "중간 발표", "2026-07-05")
+        // 미제출 + 3일 후 마감 → 임박
+        assertEquals(MilestoneStatus.DUE_SOON, milestoneStatus(ms, "t1", emptyList(), today))
+        // 제출됨
+        val sub = Submission("s1", "m1", "t1", "a", "2026-07-01")
+        assertEquals(MilestoneStatus.SUBMITTED, milestoneStatus(ms, "t1", listOf(sub), today))
+        // 다른 팀 제출은 무관
+        assertEquals(MilestoneStatus.DUE_SOON, milestoneStatus(ms, "t2", listOf(sub), today))
+        // 기한 지남
+        assertEquals(
+            MilestoneStatus.OVERDUE,
+            milestoneStatus(Milestone("m2", "c1", "x", "2026-07-01"), "t1", emptyList(), today)
+        )
+        // 여유 있음
+        assertEquals(
+            MilestoneStatus.UPCOMING,
+            milestoneStatus(Milestone("m3", "c1", "x", "2026-08-01"), "t1", emptyList(), today)
+        )
+        assertEquals("D-3", dDayLabel("2026-07-05", today))
+        assertEquals("D-DAY", dDayLabel("2026-07-02", today))
+        assertEquals("D+2", dDayLabel("2026-06-30", today))
+    }
+
+    @Test
+    fun `과목 유형별 마일스톤 템플릿`() {
+        COURSE_TYPES.forEach { type ->
+            val template = milestoneTemplate(type)
+            assertTrue("$type 템플릿이 비어있음", template.isNotEmpty())
+            // 마감일 오름차순
+            assertEquals(template.map { it.second }.sorted(), template.map { it.second })
+        }
+        assertTrue(milestoneTemplate(COURSE_TYPES[0]).size >= 5)  // 졸업작품은 학기 전체 일정
+    }
+
+    @Test
     fun `시드 데이터 참조 무결성`() {
         val d = Seed.build()
         assertEquals(2, d.teams.size)
@@ -165,6 +209,24 @@ class InsightsTest {
             assertTrue(memberIds.contains(s.teamId to s.createdBy))
             assertEquals("선택지와 집계 수가 일치해야 함", s.options.size, s.counts.size)
             assertTrue(s.options.size >= 2)
+        }
+        // LMS: 과목·마일스톤·제출 참조 무결성
+        val courseIds = d.courses.map { it.id }.toSet()
+        val milestoneIds = d.milestones.map { it.id }.toSet()
+        d.teams.forEach { t ->
+            if (t.courseId.isNotBlank()) assertTrue("팀 ${t.name}의 과목 없음", courseIds.contains(t.courseId))
+        }
+        d.milestones.forEach { m ->
+            assertTrue(courseIds.contains(m.courseId))
+            assertTrue("마일스톤 ${m.title} 날짜 형식 오류", com.nbunone.app.data.parseDateOrNull(m.dueDate) != null)
+        }
+        d.submissions.forEach { s ->
+            assertTrue(milestoneIds.contains(s.milestoneId))
+            assertTrue(memberIds.contains(s.teamId to s.memberId))
+            // 제출한 마일스톤은 팀의 과목에 속해야 함
+            val ms = d.milestones.first { it.id == s.milestoneId }
+            val team = d.teams.first { it.id == s.teamId }
+            assertEquals(team.courseId, ms.courseId)
         }
         // 시나리오 검증: 민준 무임승차, 도윤 불일치
         val t1 = d.teams.first { it.name == "N분의1" }

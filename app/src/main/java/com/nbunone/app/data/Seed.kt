@@ -8,6 +8,24 @@ object Seed {
         // 날짜는 항상 '오늘' 기준 상대값 → 잔디·스트릭·건강도가 언제 시연해도 살아있음
         fun d(daysAgo: Long): String = LocalDate.now().minusDays(daysAgo).toString()
 
+        // 과목 (미니 LMS)
+        val cSw = Course("c-sweng", "소프트웨어공학", "2026-1학기", TYPE_MIDFINAL, "중간·기말 프로젝트로 성적 평가")
+        val cCap = Course("c-capstone", "캡스톤디자인", "2026-1학기", TYPE_CAPSTONE, "졸업작품 프로젝트")
+
+        val milestones = listOf(
+            // 소프트웨어공학 (중간·기말)
+            Milestone("ms-1", cSw.id, "팀 구성·주제 확정", d(20)),
+            Milestone("ms-2", cSw.id, "제안서 제출", d(10)),
+            Milestone("ms-3", cSw.id, "중간 발표 (중간고사 대체)", LocalDate.now().plusDays(4).toString()),
+            Milestone("ms-4", cSw.id, "최종 발표 (기말고사 대체)", LocalDate.now().plusDays(25).toString()),
+            Milestone("ms-5", cSw.id, "최종 보고서 제출", LocalDate.now().plusDays(28).toString()),
+            // 캡스톤디자인 (졸업작품)
+            Milestone("ms-6", cCap.id, "주제 확정", d(35)),
+            Milestone("ms-7", cCap.id, "수행 계획서 제출", d(20)),
+            Milestone("ms-8", cCap.id, "중간 발표", LocalDate.now().plusDays(2).toString()),
+            Milestone("ms-9", cCap.id, "최종 발표", LocalDate.now().plusDays(40).toString())
+        )
+
         // 팀 1: 정상 + 무임승차 1명 (민준)
         val soi = Member("m-soi", "소이", "2021001", "팀장", "일정 관리, 기획, 발표자료 총괄")
         val jimin = Member("m-jimin", "지민", "2021002", "개발", "앱 개발 및 데이터 설계")
@@ -16,14 +34,25 @@ object Seed {
         val t1 = Team(
             "t-nbun", "N분의1", "팀플 기여도 증명 플랫폼", "무임승차 없는 공정한 팀플을 위한 앱",
             listOf(soi, jimin, sihun, minjun),
-            githubUrl = "https://github.com/jmpaark/hackerton"
+            githubUrl = "https://github.com/jmpaark/hackerton",
+            courseId = cSw.id
         )
 
         // 팀 2: 기록·평가 불일치 시연용 (도윤: 기록 많음, 평가 낮음)
         val haeun = Member("m-haeun", "하은", "2020011", "팀장", "설계 및 백엔드")
         val doyun = Member("m-doyun", "도윤", "2020012", "프론트엔드", "화면 개발")
         val seoyeon = Member("m-seoyeon", "서연", "2020013", "디자인", "UI/UX 디자인, 사용자 테스트")
-        val t2 = Team("t-capstone", "캡스톤A", "AI 학습 도우미", "졸업작품 프로젝트", listOf(haeun, doyun, seoyeon))
+        val t2 = Team(
+            "t-capstone", "캡스톤A", "AI 학습 도우미", "졸업작품 프로젝트", listOf(haeun, doyun, seoyeon),
+            courseId = cCap.id
+        )
+
+        val submissions = listOf(
+            Submission("sub-1", "ms-1", t1.id, soi.id, d(20), "주제: 팀플 기여도 증명 플랫폼"),
+            Submission("sub-2", "ms-2", t1.id, soi.id, d(10), "제안서 v1 제출", "제안서_N분의1.pdf", ""),
+            Submission("sub-3", "ms-6", t2.id, haeun.id, d(35), "주제: AI 학습 도우미"),
+            Submission("sub-4", "ms-7", t2.id, haeun.id, d(19), "계획서 제출 (하루 지연)", "수행계획서_캡스톤A.pdf", "")
+        )
 
         var seq = 0
         fun id() = "log-${seq++}"
@@ -108,6 +137,10 @@ object Seed {
             )
         )
 
-        return AppData(teams = listOf(t1, t2), logs = logs, evals = evals, artifacts = artifacts, surveys = surveys)
+        return AppData(
+            teams = listOf(t1, t2), logs = logs, evals = evals,
+            artifacts = artifacts, surveys = surveys,
+            courses = listOf(cSw, cCap), milestones = milestones, submissions = submissions
+        )
     }
 }

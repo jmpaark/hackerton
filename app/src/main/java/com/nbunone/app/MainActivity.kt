@@ -13,6 +13,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.nbunone.app.data.AppRepository
 import com.nbunone.app.ui.NbunoneTheme
+import com.nbunone.app.ui.screens.CourseCreateScreen
+import com.nbunone.app.ui.screens.CourseDetailScreen
 import com.nbunone.app.ui.screens.CreateTeamScreen
 import com.nbunone.app.ui.screens.HomeScreen
 import com.nbunone.app.ui.screens.LoginScreen
@@ -82,11 +84,29 @@ fun AppNav() {
             ProfessorDashboardScreen(
                 vm = vm, data = data,
                 onOpenTeam = { nav.navigate("profTeam/$it") },
+                onOpenCourse = { nav.navigate("course/$it") },
+                onCreateCourse = { nav.navigate("courseCreate") },
                 onSettings = { nav.navigate("settings") },
                 onLogout = {
                     vm.logout()
                     nav.navigate("login") { popUpTo(0) }
                 }
+            )
+        }
+        composable("courseCreate") {
+            CourseCreateScreen(
+                onBack = { nav.popBackStack() },
+                onCreated = { courseId ->
+                    nav.navigate("course/$courseId") { popUpTo("prof") }
+                }
+            )
+        }
+        composable("course/{courseId}") { entry ->
+            val courseId = entry.arguments?.getString("courseId") ?: return@composable
+            CourseDetailScreen(
+                data = data, courseId = courseId,
+                onBack = { nav.popBackStack() },
+                onOpenTeam = { nav.navigate("profTeam/$it") }
             )
         }
         composable("profTeam/{teamId}") { entry ->

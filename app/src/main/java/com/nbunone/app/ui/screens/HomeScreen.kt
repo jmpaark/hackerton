@@ -47,8 +47,10 @@ import com.nbunone.app.AppViewModel
 import com.nbunone.app.CurrentUser
 import com.nbunone.app.data.AppData
 import com.nbunone.app.data.Team
+import com.nbunone.app.data.dDayLabel
 import com.nbunone.app.data.parseDateOrNull
 import com.nbunone.app.data.streakDays
+import com.nbunone.app.ui.Amber
 import com.nbunone.app.ui.ContributionHeatmap
 import com.nbunone.app.ui.Slate
 import java.time.LocalDate
@@ -126,12 +128,12 @@ fun HomeScreen(
                         icon = Icons.Default.EditNote, label = "활동 기록",
                         enabled = firstTeam != null,
                         modifier = Modifier.weight(1f)
-                    ) { firstTeam?.let { onOpenTeam(it.id, 1) } }
+                    ) { firstTeam?.let { onOpenTeam(it.id, 2) } }
                     QuickAction(
                         icon = Icons.Default.HowToVote, label = "동료평가",
                         enabled = firstTeam != null,
                         modifier = Modifier.weight(1f)
-                    ) { firstTeam?.let { onOpenTeam(it.id, 2) } }
+                    ) { firstTeam?.let { onOpenTeam(it.id, 3) } }
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -139,12 +141,66 @@ fun HomeScreen(
                         icon = Icons.Default.Description, label = "산출물",
                         enabled = firstTeam != null,
                         modifier = Modifier.weight(1f)
-                    ) { firstTeam?.let { onOpenTeam(it.id, 3) } }
+                    ) { firstTeam?.let { onOpenTeam(it.id, 4) } }
                     QuickAction(
                         icon = Icons.Default.LibraryAdd, label = "팀 만들기",
                         enabled = true,
                         modifier = Modifier.weight(1f)
                     ) { onCreateTeam() }
+                }
+            }
+
+            // ── 다가오는 마감 (미니 LMS) ──
+            item {
+                val today = LocalDate.now()
+                val upcoming = myTeams.flatMap { team ->
+                    data.milestones
+                        .filter { it.courseId == team.courseId && team.courseId.isNotBlank() }
+                        .filter { m -> data.submissions.none { it.milestoneId == m.id && it.teamId == team.id } }
+                        .mapNotNull { m ->
+                            val due = parseDateOrNull(m.dueDate) ?: return@mapNotNull null
+                            if (due.isBefore(today.minusDays(7))) null else Triple(team, m, due)
+                        }
+                }.sortedBy { it.third }.take(2)
+
+                if (upcoming.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text("다가오는 마감", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Spacer(Modifier.height(10.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        upcoming.forEach { (team, m, due) ->
+                            val overdue = due.isBefore(today)
+                            val soon = !overdue && !due.isAfter(today.plusDays(3))
+                            val badgeColor = when {
+                                overdue -> MaterialTheme.colorScheme.error
+                                soon -> Amber
+                                else -> MaterialTheme.colorScheme.primary
+                            }
+                            Card(
+                                modifier = Modifier.fillMaxWidth().clickable { onOpenTeam(team.id, 1) },
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                            ) {
+                                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("📌", fontSize = 18.sp)
+                                    Spacer(Modifier.width(10.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(m.title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                        Text("${team.name} · 마감 ${m.dueDate}", fontSize = 12.sp, color = Slate)
+                                    }
+                                    Box(
+                                        Modifier.background(badgeColor.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
+                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            dDayLabel(m.dueDate, today),
+                                            fontSize = 12.sp, fontWeight = FontWeight.Bold, color = badgeColor
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

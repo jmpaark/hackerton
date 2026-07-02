@@ -74,12 +74,19 @@ import com.nbunone.app.data.AppRepository
 import com.nbunone.app.data.Artifact
 import com.nbunone.app.data.LOG_CATEGORIES
 import com.nbunone.app.data.MOODS
+import com.nbunone.app.data.MilestoneStatus
 import com.nbunone.app.data.PeerEval
+import com.nbunone.app.data.Submission
 import com.nbunone.app.data.Team
 import com.nbunone.app.data.computeInsights
+import com.nbunone.app.data.dDayLabel
+import com.nbunone.app.data.milestoneStatus
+import com.nbunone.app.ui.Amber
 import com.nbunone.app.ui.BarRow
 import com.nbunone.app.ui.ChartColors
+import com.nbunone.app.ui.Green
 import com.nbunone.app.ui.Indigo
+import com.nbunone.app.ui.Red
 import com.nbunone.app.ui.Slate
 import com.nbunone.app.ui.successColors
 import com.nbunone.app.ui.trim
@@ -97,7 +104,7 @@ fun TeamDetailScreen(vm: AppViewModel, data: AppData, teamId: String, initialTab
     val team = data.teams.firstOrNull { it.id == teamId } ?: return
     val user = vm.currentUser as? CurrentUser.Student ?: return
     val myMemberId = team.members.firstOrNull { it.name == user.name }?.id
-    var tab by remember { mutableIntStateOf(initialTab.coerceIn(0, 3)) }
+    var tab by remember { mutableIntStateOf(initialTab.coerceIn(0, 4)) }
     val snackbar = remember { SnackbarHostState() }
 
     Scaffold(
@@ -120,15 +127,16 @@ fun TeamDetailScreen(vm: AppViewModel, data: AppData, teamId: String, initialTab
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             TabRow(selectedTabIndex = tab) {
-                listOf("개요", "활동", "평가", "산출물").forEachIndexed { i, label ->
-                    Tab(selected = tab == i, onClick = { tab = i }, text = { Text(label) })
+                listOf("개요", "일정", "활동", "평가", "산출물").forEachIndexed { i, label ->
+                    Tab(selected = tab == i, onClick = { tab = i }, text = { Text(label, fontSize = 13.sp) })
                 }
             }
             when (tab) {
                 0 -> OverviewTab(team = team, data = data, myMemberId = myMemberId, onGoToTab = { tab = it })
-                1 -> LogsTab(team = team, data = data, myMemberId = myMemberId, snackbar = snackbar)
-                2 -> EvalTab(team = team, data = data, myMemberId = myMemberId, snackbar = snackbar)
-                3 -> ArtifactsTab(team = team, data = data, myMemberId = myMemberId)
+                1 -> MilestonesTab(team = team, data = data, myMemberId = myMemberId)
+                2 -> LogsTab(team = team, data = data, myMemberId = myMemberId, snackbar = snackbar)
+                3 -> EvalTab(team = team, data = data, myMemberId = myMemberId, snackbar = snackbar)
+                4 -> ArtifactsTab(team = team, data = data, myMemberId = myMemberId)
             }
         }
     }
@@ -147,8 +155,8 @@ private fun OverviewTab(team: Team, data: AppData, myMemberId: String?, onGoToTa
     val myEvalDone = if (myMemberId != null) data.evals.any { it.teamId == team.id && it.evaluatorId == myMemberId } else true
     val nextStep: Triple<String, String, Int>? = when {
         myMemberId == null -> null
-        myLogCount == 0 -> Triple("첫 활동을 기록해보세요 ✍️", "오늘 한 일을 남기는 것이 증명의 시작이에요", 1)
-        !myEvalDone && team.members.size > 1 -> Triple("동료평가를 제출해주세요 🤝", "팀원의 기여를 익명으로 평가할 수 있어요", 2)
+        myLogCount == 0 -> Triple("첫 활동을 기록해보세요 ✍️", "오늘 한 일을 남기는 것이 증명의 시작이에요", 2)
+        !myEvalDone && team.members.size > 1 -> Triple("동료평가를 제출해주세요 🤝", "팀원의 기여를 익명으로 평가할 수 있어요", 3)
         else -> null
     }
     Column(
@@ -757,6 +765,172 @@ private fun ArtifactsTab(team: Team, data: AppData, myMemberId: String?) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun MilestonesTab(team: Team, data: AppData, myMemberId: String?) {
+    val context = LocalContext.current
+    val today = java.time.LocalDate.now()
+    val course = data.courses.firstOrNull { it.id == team.courseId }
+
+    // 과목 미연결 → 과목 선택
+    if (course == null) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                Text(
+                    "과목에 연결하면 마일스톤 일정(제안서·중간발표·최종발표 등)이 표시되고, 교수님이 진행 현황을 볼 수 있어요",
+                    Modifier.padding(12.dp), fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            if (data.courses.isEmpty()) {
+                Text("아직 개설된 과목이 없어요. 교수님이 과목을 개설하면 여기서 선택할 수 있습니다.", color = Slate, fontSize = 13.sp)
+            } else {
+                Text("과목 선택", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                data.courses.forEach { c ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            if (myMemberId != null) AppRepository.setTeamCourse(team.id, c.id)
+                        },
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(c.name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                                Text("${c.semester} · ${c.type}", fontSize = 12.sp, color = Slate)
+                            }
+                            InfoChip("선택")
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
+
+    val milestones = data.milestones.filter { it.courseId == course.id }
+        .sortedBy { it.dueDate }
+    var openFormFor by remember { mutableStateOf<String?>(null) }
+    var note by remember { mutableStateOf("") }
+    var attachedName by remember { mutableStateOf("") }
+    var attachedUri by remember { mutableStateOf("") }
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) {
+            runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            attachedName = displayName(context, uri)
+            attachedUri = uri.toString()
+        }
+    }
+
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(course.name, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text("${course.semester} · ${course.type}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
+                }
+                val done = milestones.count { milestoneStatus(it, team.id, data.submissions, today) == MilestoneStatus.SUBMITTED }
+                Text("$done/${milestones.size} 완료", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+        }
+
+        milestones.forEach { m ->
+            val status = milestoneStatus(m, team.id, data.submissions, today)
+            val submission = data.submissions.firstOrNull { it.milestoneId == m.id && it.teamId == team.id }
+            val (statusColor, statusLabel) = when (status) {
+                MilestoneStatus.SUBMITTED -> Green to "제출 완료"
+                MilestoneStatus.OVERDUE -> Red to "기한 지남"
+                MilestoneStatus.DUE_SOON -> Amber to "마감 임박"
+                MilestoneStatus.UPCOMING -> MaterialTheme.colorScheme.onSurfaceVariant to "예정"
+            }
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(10.dp).background(statusColor, CircleShape))
+                        Spacer(Modifier.width(8.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(m.title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Text("마감 ${m.dueDate} · $statusLabel", fontSize = 12.sp, color = Slate)
+                        }
+                        if (status != MilestoneStatus.SUBMITTED) {
+                            Box(
+                                Modifier.background(statusColor.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(dDayLabel(m.dueDate, today), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = statusColor)
+                            }
+                        }
+                    }
+
+                    if (submission != null) {
+                        Column(
+                            Modifier.fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
+                                .padding(10.dp)
+                        ) {
+                            val submitter = team.members.firstOrNull { it.id == submission.memberId }?.name ?: "?"
+                            Text("✓ $submitter · ${submission.date} 제출", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Green)
+                            if (submission.note.isNotBlank()) Text(submission.note, fontSize = 12.sp)
+                            if (submission.artifactName.isNotBlank()) {
+                                Text("📎 ${submission.artifactName}", fontSize = 12.sp, color = Indigo)
+                            }
+                            if (myMemberId != null) {
+                                Text(
+                                    "제출 취소",
+                                    fontSize = 11.sp, color = Slate,
+                                    modifier = Modifier.padding(top = 4.dp).clickable { AppRepository.deleteSubmission(submission.id) }
+                                )
+                            }
+                        }
+                    } else if (myMemberId != null) {
+                        if (openFormFor == m.id) {
+                            OutlinedTextField(
+                                value = note, onValueChange = { note = it },
+                                label = { Text("제출 메모 (선택)") }, modifier = Modifier.fillMaxWidth()
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                OutlinedButton(onClick = { filePicker.launch(arrayOf("*/*")) }) {
+                                    Text(if (attachedName.isBlank()) "📎 파일 첨부" else "📎 ${attachedName.take(14)}…", fontSize = 12.sp)
+                                }
+                                Button(onClick = {
+                                    AppRepository.addSubmission(
+                                        Submission(
+                                            AppRepository.newId(), m.id, team.id, myMemberId,
+                                            today(), note.trim(), attachedName, attachedUri
+                                        )
+                                    )
+                                    if (attachedName.isNotBlank()) {
+                                        AppRepository.addArtifact(
+                                            Artifact(AppRepository.newId(), team.id, myMemberId, attachedName, today(), attachedUri)
+                                        )
+                                    }
+                                    note = ""; attachedName = ""; attachedUri = ""; openFormFor = null
+                                }) { Text("제출") }
+                            }
+                        } else {
+                            OutlinedButton(onClick = { openFormFor = m.id; note = ""; attachedName = ""; attachedUri = "" }) {
+                                Text("제출하기", fontSize = 13.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (milestones.isEmpty()) {
+            Text("아직 등록된 마일스톤이 없어요. 교수님이 일정을 등록하면 표시됩니다.", color = Slate, fontSize = 13.sp)
+        }
+        Spacer(Modifier.height(8.dp))
     }
 }
 

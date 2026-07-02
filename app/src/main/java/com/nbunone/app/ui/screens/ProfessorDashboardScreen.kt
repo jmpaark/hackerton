@@ -72,6 +72,8 @@ fun ProfessorDashboardScreen(
     vm: AppViewModel,
     data: AppData,
     onOpenTeam: (String) -> Unit,
+    onOpenCourse: (String) -> Unit,
+    onCreateCourse: () -> Unit,
     onSettings: () -> Unit,
     onLogout: () -> Unit
 ) {
@@ -112,6 +114,65 @@ fun ProfessorDashboardScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // 내 과목 (미니 LMS)
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("내 과목", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                    Text(
+                        "+ 과목 개설",
+                        fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable { onCreateCourse() }.padding(4.dp)
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                if (data.courses.isEmpty()) {
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                        Text(
+                            "과목을 개설하면 유형(졸업작품/중간·기말)에 맞는 마일스톤이 자동 생성되고, 팀별 진행 현황을 한눈에 볼 수 있어요",
+                            Modifier.padding(12.dp), fontSize = 12.sp, color = Slate
+                        )
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        data.courses.forEach { course ->
+                            val courseTeams = data.teams.count { it.courseId == course.id }
+                            val today0 = java.time.LocalDate.now()
+                            val nextMs = data.milestones
+                                .filter { it.courseId == course.id }
+                                .mapNotNull { m -> com.nbunone.app.data.parseDateOrNull(m.dueDate)?.let { m to it } }
+                                .filter { !it.second.isBefore(today0) }
+                                .minByOrNull { it.second }
+                            Card(
+                                modifier = Modifier.fillMaxWidth().clickable { onOpenCourse(course.id) },
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                            ) {
+                                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("📚", fontSize = 22.sp)
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(course.name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                        Text(
+                                            "${course.semester} · ${course.type} · 팀 ${courseTeams}개",
+                                            fontSize = 12.sp, color = Slate
+                                        )
+                                        nextMs?.let { (m, _) ->
+                                            Text(
+                                                "다음 마감: ${m.title} (${com.nbunone.app.data.dDayLabel(m.dueDate, today0)})",
+                                                fontSize = 12.sp, color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+            }
+
             // 상단 요약 통계
             item {
                 val today = java.time.LocalDate.now()
@@ -151,7 +212,11 @@ fun ProfessorDashboardScreen(
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(team.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                Text(team.projectName, color = Slate, fontSize = 13.sp)
+                                val courseName = data.courses.firstOrNull { it.id == team.courseId }?.name
+                                Text(
+                                    if (courseName != null) "${team.projectName} · $courseName" else team.projectName,
+                                    color = Slate, fontSize = 13.sp
+                                )
                             }
                             if (flags > 0) {
                                 val (wbg, wfg) = warnBadgeColors()
