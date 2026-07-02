@@ -8,7 +8,11 @@ object Seed {
         val jimin = Member("m-jimin", "지민", "2021002", "개발", "앱 개발 및 데이터 설계")
         val sihun = Member("m-sihun", "시훈", "2021003", "시연", "데모 영상 제작, QA, 발표")
         val minjun = Member("m-minjun", "민준", "2021004", "자료조사", "선행 사례 조사")
-        val t1 = Team("t-nbun", "N분의1", "팀플 기여도 증명 플랫폼", "무임승차 없는 공정한 팀플을 위한 앱", listOf(soi, jimin, sihun, minjun))
+        val t1 = Team(
+            "t-nbun", "N분의1", "팀플 기여도 증명 플랫폼", "무임승차 없는 공정한 팀플을 위한 앱",
+            listOf(soi, jimin, sihun, minjun),
+            githubUrl = "https://github.com/anthropics/anthropic-sdk-python"
+        )
 
         // 팀 2: 기록·평가 불일치 시연용 (도윤: 기록 많음, 평가 낮음)
         val haeun = Member("m-haeun", "하은", "2020011", "팀장", "설계 및 백엔드")
@@ -79,6 +83,12 @@ object Seed {
         eval(t2.id, seoyeon, haeun, 5, 5, 5, 4, "사실상 팀을 캐리함")
         eval(t2.id, seoyeon, doyun, 2, 2, 3, 3, "작업 시간 대비 결과물이 안 보임")
 
-        return AppData(teams = listOf(t1, t2), logs = logs, evals = evals)
+        val artifacts = listOf(
+            Artifact("art-1", t1.id, soi.id, "발표자료_N분의1_v2.pptx", "2026-06-30", ""),
+            Artifact("art-2", t1.id, sihun.id, "시연영상_최종.mp4", "2026-07-01", ""),
+            Artifact("art-3", t1.id, jimin.id, "app-debug.apk", "2026-07-01", "")
+        )
+
+        return AppData(teams = listOf(t1, t2), logs = logs, evals = evals, artifacts = artifacts)
     }
 }

@@ -77,9 +77,9 @@ fun HomeScreen(
             ExtendedFloatingActionButton(
                 onClick = onCreateTeam,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("팀 만들기") },
-                containerColor = Indigo,
-                contentColor = Color.White
+                text = { Text("팀 만들기", fontWeight = FontWeight.SemiBold) },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
             )
         }
     ) { padding ->
@@ -114,7 +114,7 @@ private fun TeamCard(team: Team, data: AppData, onClick: () -> Unit) {
     val evalDone = team.members.count { m -> data.evals.any { it.teamId == team.id && it.evaluatorId == m.id } }
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
@@ -145,9 +145,9 @@ private fun TeamCard(team: Team, data: AppData, onClick: () -> Unit) {
 fun InfoChip(text: String) {
     Box(
         Modifier
-            .background(Color(0xFFF1F5F9), RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(20.dp))
             .padding(horizontal = 10.dp, vertical = 4.dp)
     ) {
-        Text(text, fontSize = 12.sp, color = Color(0xFF475569))
+        Text(text, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

@@ -10,6 +10,8 @@ import com.nbunone.app.data.AppRepository
 import com.nbunone.app.data.Report
 import com.nbunone.app.data.Team
 import com.nbunone.app.data.computeInsights
+import com.nbunone.app.github.GitHubAnalyzer
+import com.nbunone.app.github.GitHubStats
 import kotlinx.coroutines.launch
 
 sealed class CurrentUser {
@@ -26,6 +28,23 @@ class AppViewModel : ViewModel() {
     var reportLoading by mutableStateOf(false)
         private set
     var reportError by mutableStateOf<String?>(null)
+
+    var githubStats by mutableStateOf<Map<String, GitHubStats>>(emptyMap())
+        private set
+    var githubLoadingTeam by mutableStateOf<String?>(null)
+        private set
+    var githubError by mutableStateOf<String?>(null)
+
+    fun analyzeGithub(teamId: String, url: String) {
+        githubLoadingTeam = teamId
+        githubError = null
+        viewModelScope.launch {
+            GitHubAnalyzer.analyze(url)
+                .onSuccess { githubStats = githubStats + (teamId to it) }
+                .onFailure { githubError = it.message }
+            githubLoadingTeam = null
+        }
+    }
 
     fun login(user: CurrentUser) { currentUser = user }
     fun logout() { currentUser = null }

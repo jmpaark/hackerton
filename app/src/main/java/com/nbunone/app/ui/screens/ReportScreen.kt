@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -26,6 +27,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -36,17 +39,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.nbunone.app.AppViewModel
 import com.nbunone.app.data.AppData
+import com.nbunone.app.pdf.PdfExporter
 import com.nbunone.app.ui.Indigo
 import com.nbunone.app.ui.IndigoLight
 import com.nbunone.app.ui.Slate
+import com.nbunone.app.ui.warnBadgeColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportScreen(vm: AppViewModel, data: AppData, teamId: String, onBack: () -> Unit) {
     val team = data.teams.firstOrNull { it.id == teamId } ?: return
     val report = data.reports.firstOrNull { it.teamId == teamId }
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -108,7 +115,7 @@ fun ReportScreen(vm: AppViewModel, data: AppData, teamId: String, onBack: () -> 
                     }
                     vm.reportError?.let {
                         Spacer(Modifier.height(12.dp))
-                        Text(it, color = Color(0xFFDC2626), fontSize = 13.sp)
+                        Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
                     }
                 }
             }
@@ -123,7 +130,7 @@ fun ReportScreen(vm: AppViewModel, data: AppData, teamId: String, onBack: () -> 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             Modifier
-                                .background(if (report.isAi) IndigoLight else Color(0xFFF1F5F9), RoundedCornerShape(20.dp))
+                                .background(if (report.isAi) IndigoLight else MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(20.dp))
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
                             Text(
@@ -138,12 +145,26 @@ fun ReportScreen(vm: AppViewModel, data: AppData, teamId: String, onBack: () -> 
                     }
                     Spacer(Modifier.height(12.dp))
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                     ) {
                         Column(Modifier.fillMaxWidth().padding(16.dp)) {
                             MarkdownLite(report.content)
                         }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = {
+                            runCatching {
+                                val file = PdfExporter.export(context, team.name, report.generatedAt, report.content)
+                                PdfExporter.share(context, file)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
+                        Icon(Icons.Default.IosShare, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("PDF로 저장·공유")
                     }
                     Spacer(Modifier.height(16.dp))
                 }
@@ -173,14 +194,17 @@ fun MarkdownLite(text: String) {
                 fontWeight = FontWeight.Bold, fontSize = 19.sp,
                 modifier = Modifier.padding(top = 14.dp, bottom = 4.dp)
             )
-            line.startsWith("> ") -> Text(
-                line.removePrefix("> "),
-                fontSize = 13.sp, color = Color(0xFF92400E),
-                modifier = Modifier
-                    .padding(vertical = 4.dp)
-                    .background(Color(0xFFFEF3C7), RoundedCornerShape(6.dp))
-                    .padding(8.dp)
-            )
+            line.startsWith("> ") -> {
+                val (nbg, nfg) = warnBadgeColors()
+                Text(
+                    line.removePrefix("> "),
+                    fontSize = 13.sp, color = nfg,
+                    modifier = Modifier
+                        .padding(vertical = 4.dp)
+                        .background(nbg, RoundedCornerShape(6.dp))
+                        .padding(8.dp)
+                )
+            }
             line.startsWith("- ") -> Row(Modifier.padding(vertical = 1.dp)) {
                 Text("•  ", fontSize = 14.sp, color = Slate)
                 Text(line.removePrefix("- ").replace("**", ""), fontSize = 14.sp)

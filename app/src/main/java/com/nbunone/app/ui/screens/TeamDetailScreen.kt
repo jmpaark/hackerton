@@ -1,6 +1,13 @@
 package com.nbunone.app.ui.screens
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +28,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -28,6 +37,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -48,7 +59,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,20 +68,23 @@ import com.nbunone.app.CurrentUser
 import com.nbunone.app.data.ActivityLog
 import com.nbunone.app.data.AppData
 import com.nbunone.app.data.AppRepository
+import com.nbunone.app.data.Artifact
 import com.nbunone.app.data.LOG_CATEGORIES
-import com.nbunone.app.data.Member
 import com.nbunone.app.data.PeerEval
+import com.nbunone.app.data.Team
 import com.nbunone.app.data.computeInsights
 import com.nbunone.app.ui.BarRow
 import com.nbunone.app.ui.ChartColors
 import com.nbunone.app.ui.Indigo
-import com.nbunone.app.ui.IndigoLight
 import com.nbunone.app.ui.Slate
+import com.nbunone.app.ui.successColors
 import com.nbunone.app.ui.trim
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+private fun today(): String = SimpleDateFormat("yyyy-MM-dd", Locale.KOREA).format(Date())
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,7 +115,7 @@ fun TeamDetailScreen(vm: AppViewModel, data: AppData, teamId: String, onBack: ()
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             TabRow(selectedTabIndex = tab) {
-                listOf("개요", "활동 로그", "동료평가").forEachIndexed { i, label ->
+                listOf("개요", "활동", "평가", "산출물").forEachIndexed { i, label ->
                     Tab(selected = tab == i, onClick = { tab = i }, text = { Text(label) })
                 }
             }
@@ -109,14 +123,16 @@ fun TeamDetailScreen(vm: AppViewModel, data: AppData, teamId: String, onBack: ()
                 0 -> OverviewTab(team = team, data = data)
                 1 -> LogsTab(team = team, data = data, myMemberId = myMemberId)
                 2 -> EvalTab(team = team, data = data, myMemberId = myMemberId, snackbar = snackbar)
+                3 -> ArtifactsTab(team = team, data = data, myMemberId = myMemberId)
             }
         }
     }
 }
 
 @Composable
-private fun OverviewTab(team: com.nbunone.app.data.Team, data: AppData) {
+private fun OverviewTab(team: Team, data: AppData) {
     val insights = computeInsights(team, data.logs, data.evals)
+    var github by remember(team.id) { mutableStateOf(team.githubUrl) }
     Column(
         Modifier
             .fillMaxSize()
@@ -125,19 +141,22 @@ private fun OverviewTab(team: com.nbunone.app.data.Team, data: AppData) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         if (team.description.isNotBlank()) {
-            Card(colors = CardDefaults.cardColors(containerColor = IndigoLight)) {
-                Text(team.description, Modifier.padding(12.dp), fontSize = 13.sp, color = Color(0xFF312E81))
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                Text(
+                    team.description, Modifier.padding(12.dp), fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             }
         }
         Text("팀원 및 역할", fontWeight = FontWeight.Bold, fontSize = 16.sp)
         team.members.forEachIndexed { i, m ->
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(
-                        Modifier.size(40.dp).background(ChartColors[i % ChartColors.size].copy(alpha = 0.15f), CircleShape),
+                        Modifier.size(40.dp).background(ChartColors[i % ChartColors.size].copy(alpha = 0.18f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(m.name.take(1), color = ChartColors[i % ChartColors.size], fontWeight = FontWeight.Bold)
@@ -160,7 +179,7 @@ private fun OverviewTab(team: com.nbunone.app.data.Team, data: AppData) {
         Spacer(Modifier.height(4.dp))
         Text("활동 현황", fontWeight = FontWeight.Bold, fontSize = 16.sp)
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
             Column(Modifier.padding(16.dp)) {
@@ -179,11 +198,33 @@ private fun OverviewTab(team: com.nbunone.app.data.Team, data: AppData) {
                 }
             }
         }
+
+        Spacer(Modifier.height(4.dp))
+        Text("GitHub 저장소", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("저장소를 등록하면 교수님 화면에서 커밋 기여 분석을 볼 수 있어요", fontSize = 12.sp, color = Slate)
+                OutlinedTextField(
+                    value = github,
+                    onValueChange = { github = it },
+                    label = { Text("https://github.com/...") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedButton(onClick = { AppRepository.setGithubUrl(team.id, github.trim()) }) {
+                    Text(if (team.githubUrl == github.trim() && github.isNotBlank()) "저장됨 ✓" else "저장")
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
     }
 }
 
 @Composable
-private fun LogsTab(team: com.nbunone.app.data.Team, data: AppData, myMemberId: String?) {
+private fun LogsTab(team: Team, data: AppData, myMemberId: String?) {
     var category by remember { mutableStateOf(LOG_CATEGORIES.first()) }
     var content by remember { mutableStateOf("") }
     var hours by remember { mutableFloatStateOf(1f) }
@@ -197,7 +238,7 @@ private fun LogsTab(team: com.nbunone.app.data.Team, data: AppData, myMemberId: 
     ) {
         item {
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -223,15 +264,15 @@ private fun LogsTab(team: com.nbunone.app.data.Team, data: AppData, myMemberId: 
                     Button(
                         onClick = {
                             if (myMemberId != null && content.isNotBlank()) {
-                                val today = SimpleDateFormat("yyyy-MM-dd", Locale.KOREA).format(Date())
                                 AppRepository.addLog(
-                                    ActivityLog(AppRepository.newId(), team.id, myMemberId, today, category, content.trim(), hours)
+                                    ActivityLog(AppRepository.newId(), team.id, myMemberId, today(), category, content.trim(), hours)
                                 )
                                 content = ""
                                 hours = 1f
                             }
                         },
                         enabled = myMemberId != null && content.isNotBlank(),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) { Text("기록 남기기") }
                     if (myMemberId == null) {
@@ -243,7 +284,7 @@ private fun LogsTab(team: com.nbunone.app.data.Team, data: AppData, myMemberId: 
         items(logs) { log ->
             val member = memberById[log.memberId]
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -269,7 +310,7 @@ private fun LogsTab(team: com.nbunone.app.data.Team, data: AppData, myMemberId: 
 
 @Composable
 private fun EvalTab(
-    team: com.nbunone.app.data.Team,
+    team: Team,
     data: AppData,
     myMemberId: String?,
     snackbar: SnackbarHostState
@@ -314,10 +355,11 @@ private fun EvalTab(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         if (alreadySubmitted) {
-            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFD1FAE5))) {
+            val (bg, fg) = successColors()
+            Card(colors = CardDefaults.cardColors(containerColor = bg)) {
                 Text(
                     "동료평가를 제출했어요. 수정 후 다시 제출할 수 있습니다.",
-                    Modifier.padding(12.dp), fontSize = 13.sp, color = Color(0xFF065F46)
+                    Modifier.padding(12.dp), fontSize = 13.sp, color = fg
                 )
             }
         } else {
@@ -327,7 +369,7 @@ private fun EvalTab(
         val itemLabels = listOf("기여도", "책임감", "협업", "소통")
         targets.forEach { t ->
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -383,7 +425,118 @@ private fun EvalTab(
                 AppRepository.submitEvals(team.id, myMemberId, evals)
                 scope.launch { snackbar.showSnackbar("동료평가가 제출되었습니다") }
             },
+            shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth().height(52.dp)
         ) { Text(if (alreadySubmitted) "다시 제출하기" else "평가 제출하기", fontSize = 16.sp) }
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun ArtifactsTab(team: Team, data: AppData, myMemberId: String?) {
+    val context = LocalContext.current
+    val memberById = team.members.associateBy { it.id }
+    val artifacts = data.artifacts.filter { it.teamId == team.id }.sortedByDescending { it.date }
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null && myMemberId != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            AppRepository.addArtifact(
+                Artifact(
+                    id = AppRepository.newId(),
+                    teamId = team.id,
+                    memberId = myMemberId,
+                    name = displayName(context, uri),
+                    date = today(),
+                    uri = uri.toString()
+                )
+            )
+        }
+    }
+
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("산출물 업로드", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text("보고서, 발표자료, 코드 압축본 등 결과물을 첨부해 기여의 물증을 남기세요", fontSize = 12.sp, color = Slate)
+                    Button(
+                        onClick = { launcher.launch(arrayOf("*/*")) },
+                        enabled = myMemberId != null,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("파일 선택하기")
+                    }
+                }
+            }
+        }
+        if (artifacts.isEmpty()) {
+            item {
+                Box(Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
+                    Text("아직 등록된 산출물이 없어요", color = Slate, fontSize = 13.sp)
+                }
+            }
+        }
+        items(artifacts) { a ->
+            Card(
+                modifier = Modifier.fillMaxWidth().clickable { openArtifact(context, a) },
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(40.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(10.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Description, contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(a.name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, maxLines = 1)
+                        Text(
+                            "${memberById[a.memberId]?.name ?: "?"} · ${a.date}",
+                            fontSize = 12.sp, color = Slate
+                        )
+                    }
+                    if (a.memberId == myMemberId) {
+                        IconButton(onClick = { AppRepository.deleteArtifact(a.id) }) {
+                            Icon(Icons.Default.Delete, contentDescription = "삭제", tint = Slate, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun displayName(context: Context, uri: Uri): String = runCatching {
+    context.contentResolver.query(uri, null, null, null, null)?.use { c ->
+        val i = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        if (c.moveToFirst() && i >= 0) c.getString(i) else null
+    }
+}.getOrNull() ?: (uri.lastPathSegment ?: "파일")
+
+private fun openArtifact(context: Context, artifact: Artifact) {
+    runCatching {
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            data = Uri.parse(artifact.uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(intent)
     }
 }

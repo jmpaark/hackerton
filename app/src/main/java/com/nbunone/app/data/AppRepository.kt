@@ -56,7 +56,21 @@ object AppRepository {
 
     fun setApiKey(key: String) = update { it.copy(apiKey = key) }
 
-    fun loadSeedData() = update { Seed.build() }
+    fun setTheme(mode: String, accent: String) = update { it.copy(themeMode = mode, accentColor = accent) }
 
-    fun clearAll() = update { AppData(apiKey = it.apiKey) }
+    fun setGithubUrl(teamId: String, url: String) = update { d ->
+        d.copy(teams = d.teams.map { if (it.id == teamId) it.copy(githubUrl = url) else it })
+    }
+
+    fun addArtifact(artifact: Artifact) = update { it.copy(artifacts = it.artifacts + artifact) }
+
+    fun deleteArtifact(artifactId: String) = update { d ->
+        d.copy(artifacts = d.artifacts.filterNot { it.id == artifactId })
+    }
+
+    fun loadSeedData() = update { old ->
+        Seed.build().copy(apiKey = old.apiKey, themeMode = old.themeMode, accentColor = old.accentColor)
+    }
+
+    fun clearAll() = update { AppData(apiKey = it.apiKey, themeMode = it.themeMode, accentColor = it.accentColor) }
 }

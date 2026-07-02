@@ -25,6 +25,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -42,6 +43,7 @@ import com.nbunone.app.ui.Amber
 import com.nbunone.app.ui.Indigo
 import com.nbunone.app.ui.IndigoLight
 import com.nbunone.app.ui.Slate
+import com.nbunone.app.ui.warnBadgeColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,7 +95,7 @@ fun ProfessorDashboardScreen(
                 val flags = insights.stats.count { it.flag != null }
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable { onOpenTeam(team.id) },
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
                     Column(Modifier.padding(16.dp)) {
@@ -110,15 +112,16 @@ fun ProfessorDashboardScreen(
                                 Text(team.projectName, color = Slate, fontSize = 13.sp)
                             }
                             if (flags > 0) {
+                                val (wbg, wfg) = warnBadgeColors()
                                 Row(
                                     Modifier
-                                        .background(Color(0xFFFEF3C7), RoundedCornerShape(20.dp))
+                                        .background(wbg, RoundedCornerShape(20.dp))
                                         .padding(horizontal = 10.dp, vertical = 5.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(Icons.Default.Warning, contentDescription = null, tint = Amber, modifier = Modifier.size(14.dp))
                                     Spacer(Modifier.width(4.dp))
-                                    Text("확인 필요 $flags", fontSize = 12.sp, color = Color(0xFF92400E), fontWeight = FontWeight.SemiBold)
+                                    Text("확인 필요 $flags", fontSize = 12.sp, color = wfg, fontWeight = FontWeight.SemiBold)
                                 }
                             }
                         }

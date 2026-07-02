@@ -18,7 +18,18 @@ data class Team(
     val projectName: String,
     val description: String = "",
     val members: List<Member> = emptyList(),
-    val professorComment: String = ""
+    val professorComment: String = "",
+    val githubUrl: String = ""
+)
+
+@Serializable
+data class Artifact(
+    val id: String,
+    val teamId: String,
+    val memberId: String,
+    val name: String,
+    val date: String,
+    val uri: String
 )
 
 @Serializable
@@ -61,7 +72,10 @@ data class AppData(
     val logs: List<ActivityLog> = emptyList(),
     val evals: List<PeerEval> = emptyList(),
     val reports: List<Report> = emptyList(),
-    val apiKey: String = ""
+    val artifacts: List<Artifact> = emptyList(),
+    val apiKey: String = "",
+    val themeMode: String = "system",   // system | light | dark
+    val accentColor: String = "indigo"
 )
 
 val LOG_CATEGORIES = listOf("회의", "개발", "자료조사", "문서작성", "발표준비", "기타")

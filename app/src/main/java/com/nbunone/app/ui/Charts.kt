@@ -36,6 +36,7 @@ fun DonutChart(
     size: Int = 160
 ) {
     val total = entries.sumOf { it.second.toDouble() }.toFloat()
+    val emptyColor = TrackBg
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Box(contentAlignment = Alignment.Center) {
             Canvas(modifier = Modifier.size(size.dp)) {
@@ -43,7 +44,7 @@ fun DonutChart(
                 val d = min(this.size.width, this.size.height) - stroke
                 val topLeft = Offset((this.size.width - d) / 2, (this.size.height - d) / 2)
                 if (total <= 0f) {
-                    drawArc(Color(0xFFE2E8F0), 0f, 360f, false, topLeft, Size(d, d), style = Stroke(stroke))
+                    drawArc(emptyColor, 0f, 360f, false, topLeft, Size(d, d), style = Stroke(stroke))
                 } else {
                     var start = -90f
                     entries.forEachIndexed { i, (_, v) ->
@@ -96,7 +97,7 @@ fun BarRow(label: String, value: Float, max: Float, color: Color, valueText: Str
             Modifier
                 .fillMaxWidth()
                 .height(8.dp)
-                .background(Color(0xFFE2E8F0), RoundedCornerShape(4.dp))
+                .background(TrackBg, RoundedCornerShape(4.dp))
         ) {
             val frac = if (max > 0f) (value / max).coerceIn(0f, 1f) else 0f
             Box(

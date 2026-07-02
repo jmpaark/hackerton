@@ -22,9 +22,11 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -44,8 +46,8 @@ import androidx.compose.ui.unit.sp
 import com.nbunone.app.AppViewModel
 import com.nbunone.app.data.AppData
 import com.nbunone.app.data.AppRepository
-import com.nbunone.app.data.FlagType
 import com.nbunone.app.data.computeInsights
+import com.nbunone.app.ui.flagColors
 import com.nbunone.app.ui.Amber
 import com.nbunone.app.ui.BarRow
 import com.nbunone.app.ui.ChartColors
@@ -98,16 +100,7 @@ fun ProfessorTeamScreen(
             // ⚠️ 확인 필요 플래그
             insights.stats.filter { it.flag != null }.forEach { s ->
                 val flag = s.flag!!
-                val bg = when (flag) {
-                    FlagType.MISMATCH -> Color(0xFFFEF3C7)
-                    FlagType.FREE_RIDER -> Color(0xFFFEE2E2)
-                    FlagType.UNSUNG -> Color(0xFFDBEAFE)
-                }
-                val fg = when (flag) {
-                    FlagType.MISMATCH -> Color(0xFF92400E)
-                    FlagType.FREE_RIDER -> Color(0xFF991B1B)
-                    FlagType.UNSUNG -> Color(0xFF1E40AF)
-                }
+                val (bg, fg) = flagColors(flag)
                 Card(colors = CardDefaults.cardColors(containerColor = bg)) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
                         Icon(Icons.Default.Warning, contentDescription = null, tint = fg, modifier = Modifier.size(18.dp))
@@ -172,7 +165,51 @@ fun ProfessorTeamScreen(
                     allComments.forEach { (target, c) ->
                         Row(Modifier.padding(vertical = 3.dp)) {
                             Text("→ $target", fontSize = 12.sp, color = Indigo, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(56.dp))
-                            Text("“$c”", fontSize = 12.sp, color = Color(0xFF334155))
+                            Text("“$c”", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))
+                        }
+                    }
+                }
+            }
+
+            // GitHub 커밋 분석
+            if (team.githubUrl.isNotBlank()) {
+                SectionCard(title = "GitHub 커밋 분석") {
+                    val stats = vm.githubStats[teamId]
+                    when {
+                        vm.githubLoadingTeam == teamId -> {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(10.dp))
+                                Text("커밋 내역을 분석하는 중...", fontSize = 13.sp, color = Slate)
+                            }
+                        }
+                        stats != null -> {
+                            Text(
+                                "${stats.repo} · 최근 ${stats.totalCommits}개 커밋",
+                                fontSize = 12.sp, color = Slate
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            val maxC = stats.byAuthor.maxOfOrNull { it.second } ?: 1
+                            stats.byAuthor.take(6).forEachIndexed { i, (author, count) ->
+                                BarRow(
+                                    label = author, value = count.toFloat(), max = maxC.toFloat(),
+                                    color = ChartColors[i % ChartColors.size], valueText = "${count}건"
+                                )
+                            }
+                            OutlinedButton(onClick = { vm.analyzeGithub(teamId, team.githubUrl) }) {
+                                Text("다시 분석")
+                            }
+                        }
+                        else -> {
+                            Text(team.githubUrl, fontSize = 12.sp, color = Slate)
+                            Spacer(Modifier.height(6.dp))
+                            vm.githubError?.let {
+                                Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                                Spacer(Modifier.height(6.dp))
+                            }
+                            OutlinedButton(onClick = { vm.analyzeGithub(teamId, team.githubUrl) }) {
+                                Text("커밋 기여 분석하기")
+                            }
                         }
                     }
                 }
@@ -209,7 +246,7 @@ fun ProfessorTeamScreen(
 @Composable
 fun SectionCard(title: String, content: @Composable () -> Unit) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {

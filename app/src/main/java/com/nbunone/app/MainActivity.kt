@@ -27,7 +27,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         AppRepository.init(applicationContext)
         setContent {
-            NbunoneTheme {
+            val appData by AppRepository.data.collectAsState()
+            NbunoneTheme(themeMode = appData.themeMode, accentKey = appData.accentColor) {
                 AppNav()
             }
         }

@@ -20,6 +20,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -53,6 +54,7 @@ fun CreateTeamScreen(vm: AppViewModel, onDone: () -> Unit) {
     var teamName by remember { mutableStateOf("") }
     var projectName by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
+    var githubUrl by remember { mutableStateOf("") }
     val members = remember {
         mutableStateListOf(
             mutableStateOf(MemberDraft(me, "팀장", ""))
@@ -91,6 +93,12 @@ fun CreateTeamScreen(vm: AppViewModel, onDone: () -> Unit) {
                 value = description, onValueChange = { description = it },
                 label = { Text("프로젝트 설명 (선택)") }, modifier = Modifier.fillMaxWidth()
             )
+            OutlinedTextField(
+                value = githubUrl, onValueChange = { githubUrl = it },
+                label = { Text("GitHub 저장소 주소 (선택)") },
+                placeholder = { Text("https://github.com/팀/저장소") },
+                singleLine = true, modifier = Modifier.fillMaxWidth()
+            )
 
             Spacer(Modifier.height(4.dp))
             Text("팀원 및 역할", fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -99,7 +107,7 @@ fun CreateTeamScreen(vm: AppViewModel, onDone: () -> Unit) {
             members.forEachIndexed { idx, state ->
                 val draft = state.value
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -149,6 +157,7 @@ fun CreateTeamScreen(vm: AppViewModel, onDone: () -> Unit) {
                         name = teamName.trim(),
                         projectName = projectName.trim(),
                         description = description.trim(),
+                        githubUrl = githubUrl.trim(),
                         members = members.map { s ->
                             Member(
                                 id = AppRepository.newId(),
