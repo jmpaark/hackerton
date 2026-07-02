@@ -80,6 +80,7 @@ import com.nbunone.app.ui.Slate
 import com.nbunone.app.ui.successColors
 import com.nbunone.app.ui.trim
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -259,7 +260,7 @@ private fun LogsTab(team: Team, data: AppData, myMemberId: String?) {
                     )
                     Column {
                         Text("소요 시간: ${hours.trim()}시간", fontSize = 13.sp)
-                        Slider(value = hours, onValueChange = { hours = (it * 2).toInt() / 2f }, valueRange = 0.5f..8f)
+                        Slider(value = hours, onValueChange = { hours = (it * 2).roundToInt() / 2f }, valueRange = 0.5f..8f)
                     }
                     Button(
                         onClick = {
