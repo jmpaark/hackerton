@@ -138,6 +138,9 @@ fun TeamDetailScreen(vm: AppViewModel, data: AppData, teamId: String, initialTab
 private fun OverviewTab(team: Team, data: AppData, myMemberId: String?) {
     val insights = computeInsights(team, data.logs, data.evals)
     var github by remember(team.id) { mutableStateOf(team.githubUrl) }
+    var showAddMember by remember { mutableStateOf(false) }
+    var newName by remember { mutableStateOf("") }
+    var newRole by remember { mutableStateOf("") }
     Column(
         Modifier
             .fillMaxSize()
@@ -177,6 +180,48 @@ private fun OverviewTab(team: Team, data: AppData, myMemberId: String?) {
                             Text(m.responsibilities, fontSize = 12.sp, color = Slate)
                         }
                     }
+                }
+            }
+        }
+
+        // 팀원 추가 (팀원만 가능)
+        if (myMemberId != null) {
+            if (showAddMember) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = newName, onValueChange = { newName = it },
+                                label = { Text("이름") }, singleLine = true, modifier = Modifier.weight(1f)
+                            )
+                            OutlinedTextField(
+                                value = newRole, onValueChange = { newRole = it },
+                                label = { Text("역할") }, singleLine = true, modifier = Modifier.weight(1f)
+                            )
+                        }
+                        Button(
+                            onClick = {
+                                AppRepository.addMember(
+                                    team.id,
+                                    com.nbunone.app.data.Member(
+                                        id = AppRepository.newId(),
+                                        name = newName.trim(),
+                                        role = newRole.trim()
+                                    )
+                                )
+                                newName = ""; newRole = ""; showAddMember = false
+                            },
+                            enabled = newName.isNotBlank(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("팀원 추가하기") }
+                    }
+                }
+            } else {
+                OutlinedButton(onClick = { showAddMember = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("+ 팀원 추가")
                 }
             }
         }

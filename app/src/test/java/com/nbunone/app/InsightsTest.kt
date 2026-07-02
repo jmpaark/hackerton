@@ -8,6 +8,7 @@ import com.nbunone.app.data.Seed
 import com.nbunone.app.data.Team
 import com.nbunone.app.data.computeInsights
 import com.nbunone.app.data.healthScore
+import com.nbunone.app.data.referenceShares
 import com.nbunone.app.data.streakDays
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -126,6 +127,21 @@ class InsightsTest {
         assertTrue("균형($hBalanced) > 몰빵($hSkewed)", hBalanced > hSkewed)
         assertTrue(hBalanced in 0..100 && hSkewed in 0..100)
         assertEquals(0, healthScore(team, emptyList(), emptyList(), today))
+    }
+
+    @Test
+    fun `참고 기여도 - 합이 약 100이고 기여 많은 쪽이 높다`() {
+        val logs = listOf(log("1", a, 10f), log("2", b, 5f), log("3", c, 1f))
+        val evals = listOf(
+            eval("e1", b, a, 5), eval("e2", c, a, 5),
+            eval("e3", a, b, 4), eval("e4", c, b, 4),
+            eval("e5", a, c, 2), eval("e6", b, c, 2)
+        )
+        val shares = referenceShares(computeInsights(team, logs, evals))
+        val sum = shares.sumOf { it.second }
+        assertTrue("합=$sum", sum in 98..102)  // 반올림 오차 허용
+        val byId = shares.associate { it.first.id to it.second }
+        assertTrue(byId["a"]!! > byId["b"]!! && byId["b"]!! > byId["c"]!!)
     }
 
     @Test

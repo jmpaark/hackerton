@@ -49,6 +49,7 @@ import com.nbunone.app.data.AppRepository
 import com.nbunone.app.data.computeInsights
 import com.nbunone.app.data.moodScore
 import com.nbunone.app.data.parseDateOrNull
+import com.nbunone.app.data.referenceShares
 import com.nbunone.app.ui.ContributionHeatmap
 import com.nbunone.app.ui.flagColors
 import com.nbunone.app.ui.Amber
@@ -146,6 +147,25 @@ fun ProfessorTeamScreen(
                     }
                     Text(
                         "평가 제출: ${insights.evalDone}/${team.members.size}명 · 익명 집계",
+                        fontSize = 11.sp, color = Slate
+                    )
+                }
+            }
+
+            // 참고 기여도 (필수 기능 6: 기여도 참고 점수 시각화)
+            if (insights.totalLogs > 0 || insights.evalDone > 0) {
+                SectionCard(title = "참고 기여도 (활동 60% · 동료평가 40%)") {
+                    referenceShares(insights).sortedByDescending { it.second }.forEachIndexed { i, (member, pct) ->
+                        BarRow(
+                            label = member.name,
+                            value = pct.toFloat(),
+                            max = 100f,
+                            color = ChartColors[i % ChartColors.size],
+                            valueText = "$pct%"
+                        )
+                    }
+                    Text(
+                        "※ 확정 점수가 아닌 참고 수치입니다. 최종 판단은 교수자에게 있습니다.",
                         fontSize = 11.sp, color = Slate
                     )
                 }

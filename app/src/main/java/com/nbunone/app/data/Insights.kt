@@ -80,6 +80,23 @@ fun computeInsights(team: Team, allLogs: List<ActivityLog>, allEvals: List<PeerE
     return TeamInsights(team, stats, logs.size, teamHours, evalDone, categoryHours)
 }
 
+/**
+ * 참고 기여도(%) — 활동 비중 60% + 동료평가 40% 결합.
+ * 리포트와 교수님 화면 차트가 같은 계산을 공유한다. 확정 점수가 아닌 참고 수치.
+ */
+fun referenceShares(insights: TeamInsights): List<Pair<Member, Int>> {
+    val n = insights.stats.size.coerceAtLeast(1)
+    val evalDenom = insights.stats.sumOf {
+        (if (it.evalAvg > 0f) it.evalAvg / 5f else 1f / n).toDouble()
+    }.toFloat().takeIf { it > 0f } ?: 1f
+    val weights = insights.stats.map { s ->
+        val evalNorm = if (s.evalAvg > 0f) s.evalAvg / 5f else 1f / n
+        s.member to (s.logShare * 0.6f + (evalNorm / evalDenom) * 0.4f)
+    }
+    val total = weights.sumOf { it.second.toDouble() }.toFloat().takeIf { it > 0f } ?: 1f
+    return weights.map { (m, w) -> m to (w / total * 100).roundToInt() }
+}
+
 /** 연속 기록 일수 — 오늘(또는 어제)부터 거슬러 올라가며 센다 */
 fun streakDays(logDates: Set<LocalDate>, today: LocalDate): Int {
     var day = if (today in logDates) today else today.minusDays(1)

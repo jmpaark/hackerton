@@ -166,16 +166,9 @@ object ReportGenerator {
         }
         sb.appendLine()
         sb.appendLine("## 참고 기여도 (참고 의견)")
-        // 활동 비중 60% + 동료평가 40% 가중 결합
-        val weights = insights.stats.map { s ->
-            val evalNorm = if (s.evalAvg > 0f) s.evalAvg / 5f else 1f / n
-            s.member.name to (s.logShare * 0.6f + evalNorm / insights.stats.sumOf {
-                (if (it.evalAvg > 0f) it.evalAvg / 5f else 1f / n).toDouble()
-            }.toFloat() * 0.4f)
-        }
-        val total = weights.sumOf { it.second.toDouble() }.toFloat().takeIf { it > 0f } ?: 1f
-        weights.forEach { (name, w) ->
-            sb.appendLine("- $name: ${(w / total * 100).toInt()}%")
+        // 활동 비중 60% + 동료평가 40% — 교수님 화면 차트와 동일한 계산 공유
+        com.nbunone.app.data.referenceShares(insights).forEach { (member, pct) ->
+            sb.appendLine("- ${member.name}: $pct%")
         }
         sb.appendLine()
         sb.appendLine("※ 위 비율은 활동 기록(60%)과 동료평가(40%)를 결합한 참고 수치이며, 확정 점수가 아닙니다.")

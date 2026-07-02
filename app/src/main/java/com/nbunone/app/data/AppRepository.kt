@@ -82,6 +82,12 @@ object AppRepository {
         d.copy(teams = d.teams.map { if (it.id == team.id) team else it })
     }
 
+    fun addMember(teamId: String, member: Member) = update { d ->
+        d.copy(teams = d.teams.map {
+            if (it.id == teamId) it.copy(members = it.members + member) else it
+        })
+    }
+
     fun addLog(log: ActivityLog) = update { it.copy(logs = it.logs + log) }
 
     fun deleteLog(logId: String) = update { d ->
