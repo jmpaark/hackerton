@@ -125,8 +125,8 @@ fun TeamDetailScreen(vm: AppViewModel, data: AppData, teamId: String, initialTab
                 }
             }
             when (tab) {
-                0 -> OverviewTab(team = team, data = data, myMemberId = myMemberId)
-                1 -> LogsTab(team = team, data = data, myMemberId = myMemberId)
+                0 -> OverviewTab(team = team, data = data, myMemberId = myMemberId, onGoToTab = { tab = it })
+                1 -> LogsTab(team = team, data = data, myMemberId = myMemberId, snackbar = snackbar)
                 2 -> EvalTab(team = team, data = data, myMemberId = myMemberId, snackbar = snackbar)
                 3 -> ArtifactsTab(team = team, data = data, myMemberId = myMemberId)
             }
@@ -135,12 +135,22 @@ fun TeamDetailScreen(vm: AppViewModel, data: AppData, teamId: String, initialTab
 }
 
 @Composable
-private fun OverviewTab(team: Team, data: AppData, myMemberId: String?) {
+private fun OverviewTab(team: Team, data: AppData, myMemberId: String?, onGoToTab: (Int) -> Unit) {
     val insights = computeInsights(team, data.logs, data.evals)
     var github by remember(team.id) { mutableStateOf(team.githubUrl) }
     var showAddMember by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
     var newRole by remember { mutableStateOf("") }
+
+    // 다음 할 일 계산
+    val myLogCount = if (myMemberId != null) data.logs.count { it.teamId == team.id && it.memberId == myMemberId } else 0
+    val myEvalDone = if (myMemberId != null) data.evals.any { it.teamId == team.id && it.evaluatorId == myMemberId } else true
+    val nextStep: Triple<String, String, Int>? = when {
+        myMemberId == null -> null
+        myLogCount == 0 -> Triple("첫 활동을 기록해보세요 ✍️", "오늘 한 일을 남기는 것이 증명의 시작이에요", 1)
+        !myEvalDone && team.members.size > 1 -> Triple("동료평가를 제출해주세요 🤝", "팀원의 기여를 익명으로 평가할 수 있어요", 2)
+        else -> null
+    }
     Column(
         Modifier
             .fillMaxSize()
@@ -148,6 +158,25 @@ private fun OverviewTab(team: Team, data: AppData, myMemberId: String?) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // 다음 할 일 안내
+        nextStep?.let { (title, desc, targetTab) ->
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                Row(
+                    Modifier.fillMaxWidth().padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(title, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Text(desc, fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Button(onClick = { onGoToTab(targetTab) }, shape = RoundedCornerShape(12.dp)) {
+                        Text("바로 가기", fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+
         if (team.description.isNotBlank()) {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                 Text(
@@ -192,6 +221,10 @@ private fun OverviewTab(team: Team, data: AppData, myMemberId: String?) {
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "팀원이 로그인할 때 쓸 이름과 똑같이 입력해야 팀원 홈에 이 팀이 보여요",
+                            fontSize = 11.sp, color = Slate
+                        )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedTextField(
                                 value = newName, onValueChange = { newName = it },
@@ -404,11 +437,12 @@ private fun shareSurvey(context: Context, teamName: String, survey: com.nbunone.
 }
 
 @Composable
-private fun LogsTab(team: Team, data: AppData, myMemberId: String?) {
+private fun LogsTab(team: Team, data: AppData, myMemberId: String?, snackbar: SnackbarHostState) {
     var category by remember { mutableStateOf(LOG_CATEGORIES.first()) }
     var content by remember { mutableStateOf("") }
     var hours by remember { mutableFloatStateOf(1f) }
     var mood by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
     val logs = data.logs.filter { it.teamId == team.id }.sortedByDescending { it.date }
     val memberById = team.members.associateBy { it.id }
 
@@ -469,6 +503,7 @@ private fun LogsTab(team: Team, data: AppData, myMemberId: String?) {
                                 content = ""
                                 hours = 1f
                                 mood = ""
+                                scope.launch { snackbar.showSnackbar("기록 완료! 오늘도 증명 +1 🌱") }
                             }
                         },
                         enabled = myMemberId != null && content.isNotBlank(),

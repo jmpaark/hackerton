@@ -180,15 +180,38 @@ fun HomeScreen(
             }
             if (myTeams.isEmpty()) {
                 item {
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                        Column(
-                            Modifier.fillMaxWidth().padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(Icons.Default.Groups, contentDescription = null, tint = Slate, modifier = Modifier.size(40.dp))
-                            Spacer(Modifier.height(8.dp))
-                            Text("아직 소속된 팀이 없어요", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                            Text("위의 '팀 만들기'로 시작하거나 팀장에게 등록을 요청하세요", color = Slate, fontSize = 12.sp)
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                            Text("🚀 이렇게 시작하세요", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Spacer(Modifier.height(12.dp))
+                            listOf(
+                                "1" to "팀을 만들고 팀원과 역할을 등록해요",
+                                "2" to "매일 한 일을 활동 로그로 남겨요",
+                                "3" to "프로젝트가 끝나면 서로 동료평가를 해요",
+                                "4" to "교수님은 근거와 함께 기여도를 확인해요"
+                            ).forEach { (num, text) ->
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(vertical = 5.dp)
+                                ) {
+                                    Box(
+                                        Modifier.size(22.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(num, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                    Spacer(Modifier.width(10.dp))
+                                    Text(text, fontSize = 13.sp)
+                                }
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "팀원이라면? 팀장에게 내 이름(로그인 이름과 동일)으로 등록을 요청하세요",
+                                fontSize = 11.sp, color = Slate
+                            )
                         }
                     }
                 }

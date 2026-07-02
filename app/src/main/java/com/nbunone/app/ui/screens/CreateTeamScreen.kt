@@ -49,7 +49,7 @@ private data class MemberDraft(var name: String, var role: String, var resp: Str
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateTeamScreen(vm: AppViewModel, onDone: () -> Unit) {
+fun CreateTeamScreen(vm: AppViewModel, onBack: () -> Unit, onCreated: (teamId: String) -> Unit) {
     val me = (vm.currentUser as? CurrentUser.Student)?.name ?: ""
     var teamName by remember { mutableStateOf("") }
     var projectName by remember { mutableStateOf("") }
@@ -66,7 +66,7 @@ fun CreateTeamScreen(vm: AppViewModel, onDone: () -> Unit) {
             TopAppBar(
                 title = { Text("팀 만들기", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onDone) {
+                    IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로")
                     }
                 }
@@ -102,7 +102,10 @@ fun CreateTeamScreen(vm: AppViewModel, onDone: () -> Unit) {
 
             Spacer(Modifier.height(4.dp))
             Text("팀원 및 역할", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text("팀원별 역할과 담당 업무를 입력하세요", color = Slate, fontSize = 12.sp)
+            Text(
+                "팀원 이름은 팀원이 로그인할 때 쓸 이름과 똑같이 입력해주세요 — 그래야 팀원 홈에 이 팀이 보여요",
+                color = Slate, fontSize = 12.sp
+            )
 
             members.forEachIndexed { idx, state ->
                 val draft = state.value
@@ -123,8 +126,10 @@ fun CreateTeamScreen(vm: AppViewModel, onDone: () -> Unit) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedTextField(
                                 value = draft.name,
-                                onValueChange = { state.value = draft.copy(name = it) },
-                                label = { Text("이름") }, singleLine = true,
+                                onValueChange = { if (idx > 0) state.value = draft.copy(name = it) },
+                                label = { Text(if (idx == 0) "이름 (본인)" else "이름") },
+                                readOnly = idx == 0,
+                                singleLine = true,
                                 modifier = Modifier.weight(1f)
                             )
                             OutlinedTextField(
@@ -152,8 +157,9 @@ fun CreateTeamScreen(vm: AppViewModel, onDone: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = {
+                    val newTeamId = AppRepository.newId()
                     val team = Team(
-                        id = AppRepository.newId(),
+                        id = newTeamId,
                         name = teamName.trim(),
                         projectName = projectName.trim(),
                         description = description.trim(),
@@ -169,7 +175,7 @@ fun CreateTeamScreen(vm: AppViewModel, onDone: () -> Unit) {
                         }.filter { it.name.isNotBlank() }
                     )
                     AppRepository.addTeam(team)
-                    onDone()
+                    onCreated(newTeamId)
                 },
                 enabled = teamName.isNotBlank() && projectName.isNotBlank() &&
                         members.any { it.value.name.isNotBlank() },

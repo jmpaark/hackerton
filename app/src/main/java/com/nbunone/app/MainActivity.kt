@@ -62,7 +62,16 @@ fun AppNav() {
             )
         }
         composable("createTeam") {
-            CreateTeamScreen(vm = vm, onDone = { nav.popBackStack() })
+            CreateTeamScreen(
+                vm = vm,
+                onBack = { nav.popBackStack() },
+                onCreated = { teamId ->
+                    // 생성한 팀으로 바로 진입 (뒤로 가면 홈)
+                    nav.navigate("team/$teamId/0") {
+                        popUpTo("home")
+                    }
+                }
+            )
         }
         composable("team/{teamId}/{tab}") { entry ->
             val teamId = entry.arguments?.getString("teamId") ?: return@composable

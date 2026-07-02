@@ -101,8 +101,9 @@ fun ProfessorDashboardScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Text("등록된 팀이 없습니다", fontWeight = FontWeight.SemiBold)
-                Text("로그인 화면의 '데모 데이터 불러오기'로 체험할 수 있어요", color = Slate, fontSize = 13.sp)
+                Text("아직 등록된 팀이 없습니다", fontWeight = FontWeight.SemiBold)
+                Text("학생이 팀을 만들면 여기에 표시됩니다", color = Slate, fontSize = 13.sp)
+                Text("체험: 설정 → 데모 데이터 불러오기", color = Slate, fontSize = 12.sp)
             }
             return@Scaffold
         }
