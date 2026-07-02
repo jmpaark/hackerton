@@ -158,6 +158,7 @@ fun CreateTeamScreen(vm: AppViewModel, onDone: () -> Unit) {
                         projectName = projectName.trim(),
                         description = description.trim(),
                         githubUrl = githubUrl.trim(),
+                        createdByName = me,
                         members = members.map { s ->
                             Member(
                                 id = AppRepository.newId(),

@@ -17,7 +17,7 @@ object AppRepository {
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
     private lateinit var file: File
-    private var securePrefs: SharedPreferences? = null
+    @Volatile private var securePrefs: SharedPreferences? = null
     private val diskExecutor = Executors.newSingleThreadExecutor()
     @Volatile private var initialized = false
 
@@ -28,28 +28,31 @@ object AppRepository {
         if (initialized) return
         synchronized(this) {
             if (initialized) return
-            file = File(context.filesDir, "nbunone.json")
-            // API 키는 평문 JSON이 아닌 암호화 저장소에 보관
-            securePrefs = runCatching {
-                val masterKey = MasterKey.Builder(context.applicationContext)
-                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                    .build()
-                EncryptedSharedPreferences.create(
-                    context.applicationContext,
-                    "nbunone_secure",
-                    masterKey,
-                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                )
-            }.getOrElse {
-                // 키스토어 미지원 기기 폴백
-                context.getSharedPreferences("nbunone_secure_fallback", Context.MODE_PRIVATE)
-            }
-            val loaded = if (file.exists()) {
-                runCatching { json.decodeFromString<AppData>(file.readText()) }.getOrNull() ?: AppData()
-            } else AppData()
-            _data.value = loaded.copy(apiKey = securePrefs?.getString(KEY_API, "") ?: "")
             initialized = true
+            val app = context.applicationContext
+            file = File(app.filesDir, "nbunone.json")
+            // Keystore/디스크 접근은 느릴 수 있으므로 메인 스레드를 블록하지 않는다 (ANR 방지)
+            diskExecutor.execute {
+                securePrefs = runCatching {
+                    val masterKey = MasterKey.Builder(app)
+                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                        .build()
+                    EncryptedSharedPreferences.create(
+                        app,
+                        "nbunone_secure",
+                        masterKey,
+                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                    )
+                }.getOrElse {
+                    // 키스토어 미지원 기기 폴백
+                    app.getSharedPreferences("nbunone_secure_fallback", Context.MODE_PRIVATE)
+                }
+                val loaded = if (file.exists()) {
+                    runCatching { json.decodeFromString<AppData>(file.readText()) }.getOrNull() ?: AppData()
+                } else AppData()
+                _data.value = loaded.copy(apiKey = securePrefs?.getString(KEY_API, "") ?: "")
+            }
         }
     }
 
@@ -107,6 +110,22 @@ object AppRepository {
 
     fun setGithubUrl(teamId: String, url: String) = update { d ->
         d.copy(teams = d.teams.map { if (it.id == teamId) it.copy(githubUrl = url) else it })
+    }
+
+    fun addSurvey(survey: Survey) = update { it.copy(surveys = it.surveys + survey) }
+
+    fun deleteSurvey(surveyId: String) = update { d ->
+        d.copy(surveys = d.surveys.filterNot { it.id == surveyId })
+    }
+
+    fun adjustSurveyCount(surveyId: String, optionIndex: Int, delta: Int) = update { d ->
+        d.copy(surveys = d.surveys.map { s ->
+            if (s.id == surveyId && optionIndex in s.counts.indices) {
+                s.copy(counts = s.counts.mapIndexed { i, c ->
+                    if (i == optionIndex) (c + delta).coerceAtLeast(0) else c
+                })
+            } else s
+        })
     }
 
     fun addArtifact(artifact: Artifact) = update { it.copy(artifacts = it.artifacts + artifact) }

@@ -51,7 +51,9 @@ class AppViewModel : ViewModel() {
 
     fun myTeams(): List<Team> {
         val user = currentUser as? CurrentUser.Student ?: return emptyList()
-        return data.value.teams.filter { t -> t.members.any { it.name == user.name } }
+        return data.value.teams.filter { t ->
+            t.members.any { it.name == user.name } || t.createdByName == user.name
+        }
     }
 
     fun memberIdIn(team: Team): String? {

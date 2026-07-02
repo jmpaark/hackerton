@@ -95,6 +95,19 @@ object Seed {
             Artifact("art-3", t1.id, jimin.id, "app-debug.apk", d(1), "")
         )
 
-        return AppData(teams = listOf(t1, t2), logs = logs, evals = evals, artifacts = artifacts)
+        val surveys = listOf(
+            Survey(
+                "sv-1", t1.id, soi.id,
+                "팀플에서 무임승차를 경험한 적 있나요?",
+                listOf("있다", "없다"), listOf(87, 13), d(3)
+            ),
+            Survey(
+                "sv-2", t1.id, sihun.id,
+                "팀플 기여도가 성적에 반영되어야 한다고 생각하나요?",
+                listOf("매우 그렇다", "그렇다", "보통", "아니다"), listOf(52, 31, 12, 5), d(2)
+            )
+        )
+
+        return AppData(teams = listOf(t1, t2), logs = logs, evals = evals, artifacts = artifacts, surveys = surveys)
     }
 }

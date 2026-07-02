@@ -145,6 +145,11 @@ class InsightsTest {
         d.artifacts.forEach { a ->
             assertTrue(memberIds.contains(a.teamId to a.memberId))
         }
+        d.surveys.forEach { s ->
+            assertTrue(memberIds.contains(s.teamId to s.createdBy))
+            assertEquals("선택지와 집계 수가 일치해야 함", s.options.size, s.counts.size)
+            assertTrue(s.options.size >= 2)
+        }
         // 시나리오 검증: 민준 무임승차, 도윤 불일치
         val t1 = d.teams.first { it.name == "N분의1" }
         val i1 = computeInsights(t1, d.logs, d.evals)

@@ -49,6 +49,23 @@ import com.nbunone.app.ui.Red
 import com.nbunone.app.ui.Slate
 import com.nbunone.app.ui.warnBadgeColors
 
+@Composable
+private fun StatCard(label: String, value: String, modifier: Modifier = Modifier, highlight: Boolean = false) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(Modifier.fillMaxWidth().padding(vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                value, fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                color = if (highlight) Amber else MaterialTheme.colorScheme.primary
+            )
+            Text(label, fontSize = 11.sp, color = Slate)
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfessorDashboardScreen(
@@ -94,6 +111,20 @@ fun ProfessorDashboardScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // 상단 요약 통계
+            item {
+                val today = java.time.LocalDate.now()
+                val totalFlags = data.teams.sumOf { t ->
+                    computeInsights(t, data.logs, data.evals).stats.count { it.flag != null }
+                }
+                val avgHealth = if (data.teams.isEmpty()) 0
+                else data.teams.map { healthScore(it, data.logs, data.evals, today) }.average().toInt()
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    StatCard("담당 팀", "${data.teams.size}", Modifier.weight(1f))
+                    StatCard("확인 필요", "$totalFlags", Modifier.weight(1f), highlight = totalFlags > 0)
+                    StatCard("평균 건강도", "$avgHealth", Modifier.weight(1f))
+                }
+            }
             items(data.teams) { team ->
                 val insights = computeInsights(team, data.logs, data.evals)
                 val flags = insights.stats.count { it.flag != null }

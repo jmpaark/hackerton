@@ -1,6 +1,10 @@
 package com.nbunone.app.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,11 +21,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,8 +50,10 @@ import com.nbunone.app.ui.Slate
 @Composable
 fun LoginScreen(vm: AppViewModel, data: AppData, onLoggedIn: (isProfessor: Boolean) -> Unit) {
     var name by remember { mutableStateOf("") }
+    var role by remember { mutableStateOf("student") }
     val knownNames = data.teams.flatMap { t -> t.members.map { it.name } }.distinct()
     val primary = MaterialTheme.colorScheme.primary
+    val context = LocalContext.current
 
     Box(
         Modifier
@@ -66,7 +74,7 @@ fun LoginScreen(vm: AppViewModel, data: AppData, onLoggedIn: (isProfessor: Boole
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // 히어로 로고
+            // 로고 — 길게 누르면 데모 데이터 로드 (숨김 제스처)
             Box(
                 Modifier
                     .size(96.dp)
@@ -74,76 +82,119 @@ fun LoginScreen(vm: AppViewModel, data: AppData, onLoggedIn: (isProfessor: Boole
                     .background(
                         Brush.linearGradient(listOf(primary, primary.copy(alpha = 0.75f))),
                         RoundedCornerShape(28.dp)
-                    ),
+                    )
+                    .pointerInput(Unit) {
+                        detectTapGestures(onLongPress = {
+                            AppRepository.loadSeedData()
+                            Toast.makeText(context, "데모 데이터를 불러왔어요", Toast.LENGTH_SHORT).show()
+                        })
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Text("1/N", color = MaterialTheme.colorScheme.onPrimary, fontSize = 30.sp, fontWeight = FontWeight.Black)
             }
-            Spacer(Modifier.height(20.dp))
-            Text("N분의1", fontSize = 32.sp, fontWeight = FontWeight.Black, letterSpacing = (-0.5).sp)
-            Spacer(Modifier.height(8.dp))
-            Text("팀플 점수는 N분의 1로 나뉩니다.", color = Slate, fontSize = 14.sp)
-            Row {
-                Text("일도 ", color = Slate, fontSize = 14.sp)
-                Text("N분의 1", color = primary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text("로 나뉘었을까요?", color = Slate, fontSize = 14.sp)
-            }
+            Spacer(Modifier.height(18.dp))
+            Text("N분의1", fontSize = 30.sp, fontWeight = FontWeight.Black, letterSpacing = (-0.5).sp)
             Spacer(Modifier.height(40.dp))
 
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("이름") },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth()
-            )
-            if (knownNames.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
-                ) {
-                    knownNames.take(4).forEach { n ->
-                        AssistChip(
-                            onClick = { name = n },
-                            label = { Text(n) },
-                            shape = RoundedCornerShape(20.dp)
-                        )
-                    }
-                }
+            // 역할 선택
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                RoleCard(
+                    emoji = "🎓", title = "학생",
+                    description = "기여를 기록하고\n증명해요",
+                    selected = role == "student",
+                    modifier = Modifier.weight(1f)
+                ) { role = "student" }
+                RoleCard(
+                    emoji = "👨‍🏫", title = "교수님",
+                    description = "근거를 바탕으로\n공정하게 평가해요",
+                    selected = role == "professor",
+                    modifier = Modifier.weight(1f)
+                ) { role = "professor" }
             }
             Spacer(Modifier.height(20.dp))
+
+            if (role == "student") {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("이름") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (knownNames.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+                    ) {
+                        knownNames.take(4).forEach { n ->
+                            AssistChip(
+                                onClick = { name = n },
+                                label = { Text(n) },
+                                shape = RoundedCornerShape(20.dp)
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+
             Button(
                 onClick = {
-                    if (name.isNotBlank()) {
+                    if (role == "professor") {
+                        vm.login(CurrentUser.Professor)
+                        onLoggedIn(true)
+                    } else if (name.isNotBlank()) {
                         vm.login(CurrentUser.Student(name.trim()))
                         onLoggedIn(false)
                     }
                 },
-                enabled = name.isNotBlank(),
+                enabled = role == "professor" || name.isNotBlank(),
                 shape = RoundedCornerShape(16.dp),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
                 modifier = Modifier.fillMaxWidth().height(54.dp)
             ) {
-                Text("학생으로 시작하기", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("시작하기", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
-            Spacer(Modifier.height(10.dp))
-            OutlinedButton(
-                onClick = {
-                    vm.login(CurrentUser.Professor)
-                    onLoggedIn(true)
-                },
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth().height(54.dp)
-            ) {
-                Text("교수님으로 시작하기", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            }
+        }
+    }
+}
 
-            Spacer(Modifier.height(28.dp))
-            TextButton(onClick = { AppRepository.loadSeedData() }) {
-                Text("데모 데이터 불러오기", color = Slate, fontSize = 13.sp)
-            }
+@Composable
+private fun RoleCard(
+    emoji: String,
+    title: String,
+    description: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    Card(
+        modifier = modifier
+            .then(
+                if (selected) Modifier.border(2.dp, primary, RoundedCornerShape(18.dp))
+                else Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(18.dp))
+            )
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(emoji, fontSize = 26.sp)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                title, fontWeight = FontWeight.Bold, fontSize = 16.sp,
+                color = if (selected) primary else MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(description, fontSize = 11.sp, color = Slate, lineHeight = 15.sp)
         }
     }
 }

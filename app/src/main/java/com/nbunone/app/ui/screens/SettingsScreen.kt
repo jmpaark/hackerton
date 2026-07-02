@@ -160,6 +160,12 @@ fun SettingsScreen(vm: AppViewModel, data: AppData, onBack: () -> Unit) {
                 Text("모든 데이터 초기화")
             }
             Text("초기화해도 API 키와 테마 설정은 유지됩니다", color = Slate, fontSize = 12.sp)
+
+            Spacer(Modifier.height(20.dp))
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("N분의1 v1.0", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate)
+                Text("팀플 기여도 증명 플랫폼 · 제1회 SW 해커톤", fontSize = 11.sp, color = Slate)
+            }
             Spacer(Modifier.height(8.dp))
         }
     }

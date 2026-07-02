@@ -54,6 +54,7 @@ fun AppNav() {
                 vm = vm, data = data,
                 onCreateTeam = { nav.navigate("createTeam") },
                 onOpenTeam = { teamId, tab -> nav.navigate("team/$teamId/$tab") },
+                onSettings = { nav.navigate("settings") },
                 onLogout = {
                     vm.logout()
                     nav.navigate("login") { popUpTo(0) }

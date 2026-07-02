@@ -27,8 +27,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -123,7 +125,7 @@ fun TeamDetailScreen(vm: AppViewModel, data: AppData, teamId: String, initialTab
                 }
             }
             when (tab) {
-                0 -> OverviewTab(team = team, data = data)
+                0 -> OverviewTab(team = team, data = data, myMemberId = myMemberId)
                 1 -> LogsTab(team = team, data = data, myMemberId = myMemberId)
                 2 -> EvalTab(team = team, data = data, myMemberId = myMemberId, snackbar = snackbar)
                 3 -> ArtifactsTab(team = team, data = data, myMemberId = myMemberId)
@@ -133,7 +135,7 @@ fun TeamDetailScreen(vm: AppViewModel, data: AppData, teamId: String, initialTab
 }
 
 @Composable
-private fun OverviewTab(team: Team, data: AppData) {
+private fun OverviewTab(team: Team, data: AppData, myMemberId: String?) {
     val insights = computeInsights(team, data.logs, data.evals)
     var github by remember(team.id) { mutableStateOf(team.githubUrl) }
     Column(
@@ -222,7 +224,137 @@ private fun OverviewTab(team: Team, data: AppData) {
                 }
             }
         }
+
+        Spacer(Modifier.height(4.dp))
+        Text("팀 설문", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        SurveySection(team = team, data = data, myMemberId = myMemberId)
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun SurveySection(team: Team, data: AppData, myMemberId: String?) {
+    val context = LocalContext.current
+    val surveys = data.surveys.filter { it.teamId == team.id }.sortedByDescending { it.date }
+    var question by remember { mutableStateOf("") }
+    var optionsText by remember { mutableStateOf("") }
+    var showForm by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+            Text(
+                "설문을 만들어 에브리타임 등 커뮤니티에 공유하고, 응답 결과를 집계해 프로젝트 근거 데이터로 쓰세요",
+                Modifier.padding(12.dp), fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+
+        surveys.forEach { survey ->
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Q. ${survey.question}", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Text("응답 ${survey.total}건 · ${survey.date}", fontSize = 11.sp, color = Slate)
+                        }
+                        if (survey.createdBy == myMemberId) {
+                            IconButton(onClick = { AppRepository.deleteSurvey(survey.id) }) {
+                                Icon(Icons.Default.Delete, contentDescription = "삭제", tint = Slate, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                    val maxCount = (survey.counts.maxOrNull() ?: 1).coerceAtLeast(1)
+                    survey.options.forEachIndexed { i, opt ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                BarRow(
+                                    label = opt,
+                                    value = survey.counts[i].toFloat(),
+                                    max = maxCount.toFloat(),
+                                    color = ChartColors[i % ChartColors.size],
+                                    valueText = "${survey.counts[i]}"
+                                )
+                            }
+                            if (myMemberId != null) {
+                                IconButton(
+                                    onClick = { AppRepository.adjustSurveyCount(survey.id, i, +1) },
+                                    modifier = Modifier.size(30.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = "+1", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
+                    OutlinedButton(onClick = { shareSurvey(context, team.name, survey) }) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("에브리타임에 공유", fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+
+        if (showForm) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = question, onValueChange = { question = it },
+                        label = { Text("질문") }, modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = optionsText, onValueChange = { optionsText = it },
+                        label = { Text("선택지 (쉼표로 구분)") },
+                        placeholder = { Text("예: 있다, 없다") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(
+                        onClick = {
+                            val opts = optionsText.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                            if (myMemberId != null && question.isNotBlank() && opts.size >= 2) {
+                                AppRepository.addSurvey(
+                                    com.nbunone.app.data.Survey(
+                                        AppRepository.newId(), team.id, myMemberId,
+                                        question.trim(), opts, List(opts.size) { 0 }, today()
+                                    )
+                                )
+                                question = ""; optionsText = ""; showForm = false
+                            }
+                        },
+                        enabled = myMemberId != null && question.isNotBlank() &&
+                                optionsText.split(",").count { it.isNotBlank() } >= 2,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("설문 만들기") }
+                }
+            }
+        } else {
+            OutlinedButton(onClick = { showForm = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("+ 새 설문 만들기")
+            }
+        }
+    }
+}
+
+private fun shareSurvey(context: Context, teamName: String, survey: com.nbunone.app.data.Survey) {
+    val text = buildString {
+        appendLine("📊 [$teamName 팀] 설문 부탁드려요!")
+        appendLine()
+        appendLine("Q. ${survey.question}")
+        survey.options.forEachIndexed { i, opt -> appendLine("${i + 1}) $opt") }
+        appendLine()
+        append("댓글로 번호를 남겨주세요 🙏")
+    }
+    runCatching {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        context.startActivity(Intent.createChooser(intent, "설문 공유"))
     }
 }
 

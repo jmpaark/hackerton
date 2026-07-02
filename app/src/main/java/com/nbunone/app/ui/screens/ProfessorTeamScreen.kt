@@ -208,6 +208,27 @@ fun ProfessorTeamScreen(
                 }
             }
 
+            // 팀이 수집한 설문 결과
+            val surveys = data.surveys.filter { it.teamId == teamId }
+            if (surveys.isNotEmpty()) {
+                SectionCard(title = "팀 설문 결과 (${surveys.size}건)") {
+                    surveys.forEach { survey ->
+                        Text("Q. ${survey.question}", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Text("응답 ${survey.total}건", fontSize = 11.sp, color = Slate)
+                        val maxCount = (survey.counts.maxOrNull() ?: 1).coerceAtLeast(1)
+                        survey.options.forEachIndexed { i, opt ->
+                            BarRow(
+                                label = opt, value = survey.counts[i].toFloat(),
+                                max = maxCount.toFloat(),
+                                color = ChartColors[i % ChartColors.size],
+                                valueText = "${survey.counts[i]}"
+                            )
+                        }
+                        Spacer(Modifier.height(10.dp))
+                    }
+                }
+            }
+
             // 익명 코멘트
             val allComments = insights.stats.flatMap { s -> s.comments.map { s.member.name to it } }
             if (allComments.isNotEmpty()) {

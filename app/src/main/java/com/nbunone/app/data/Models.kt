@@ -19,7 +19,8 @@ data class Team(
     val description: String = "",
     val members: List<Member> = emptyList(),
     val professorComment: String = "",
-    val githubUrl: String = ""
+    val githubUrl: String = "",
+    val createdByName: String = ""   // 생성자 이름 — 팀원 명단과 달라도 홈에 보이도록
 )
 
 @Serializable
@@ -59,6 +60,20 @@ data class PeerEval(
     val average: Float get() = (contribution + responsibility + collaboration + communication) / 4f
 }
 
+/** 팀 설문 — 에브리타임 등 외부 커뮤니티에 공유하고 결과를 집계 */
+@Serializable
+data class Survey(
+    val id: String,
+    val teamId: String,
+    val createdBy: String,
+    val question: String,
+    val options: List<String>,
+    val counts: List<Int>,
+    val date: String
+) {
+    val total: Int get() = counts.sum()
+}
+
 @Serializable
 data class Report(
     val teamId: String,
@@ -74,6 +89,7 @@ data class AppData(
     val evals: List<PeerEval> = emptyList(),
     val reports: List<Report> = emptyList(),
     val artifacts: List<Artifact> = emptyList(),
+    val surveys: List<Survey> = emptyList(),
     val apiKey: String = "",
     val themeMode: String = "system",   // system | light | dark
     val accentColor: String = "indigo"

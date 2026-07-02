@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.HowToVote
 import androidx.compose.material.icons.filled.LibraryAdd
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -59,10 +60,13 @@ fun HomeScreen(
     data: AppData,
     onCreateTeam: () -> Unit,
     onOpenTeam: (teamId: String, tab: Int) -> Unit,
+    onSettings: () -> Unit,
     onLogout: () -> Unit
 ) {
     val user = vm.currentUser as? CurrentUser.Student ?: return
-    val myTeams = data.teams.filter { t -> t.members.any { it.name == user.name } }
+    val myTeams = data.teams.filter { t ->
+        t.members.any { it.name == user.name } || t.createdByName == user.name
+    }
     val myMemberIds = myTeams.mapNotNull { t -> t.members.firstOrNull { it.name == user.name }?.id }.toSet()
     val myLogs = data.logs.filter { it.memberId in myMemberIds }
     val myDates = myLogs.mapNotNull { parseDateOrNull(it.date) }.toSet()
@@ -97,6 +101,9 @@ fun HomeScreen(
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
+                    }
+                    IconButton(onClick = onSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "설정")
                     }
                     IconButton(onClick = onLogout) {
                         Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "로그아웃")
