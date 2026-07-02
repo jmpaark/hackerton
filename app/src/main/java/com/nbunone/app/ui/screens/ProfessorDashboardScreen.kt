@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
@@ -39,9 +40,12 @@ import androidx.compose.ui.unit.sp
 import com.nbunone.app.AppViewModel
 import com.nbunone.app.data.AppData
 import com.nbunone.app.data.computeInsights
+import com.nbunone.app.data.healthScore
 import com.nbunone.app.ui.Amber
+import com.nbunone.app.ui.Green
 import com.nbunone.app.ui.Indigo
 import com.nbunone.app.ui.IndigoLight
+import com.nbunone.app.ui.Red
 import com.nbunone.app.ui.Slate
 import com.nbunone.app.ui.warnBadgeColors
 
@@ -93,6 +97,12 @@ fun ProfessorDashboardScreen(
             items(data.teams) { team ->
                 val insights = computeInsights(team, data.logs, data.evals)
                 val flags = insights.stats.count { it.flag != null }
+                val health = healthScore(team, data.logs, data.evals, java.time.LocalDate.now())
+                val healthColor = when {
+                    health >= 70 -> Green
+                    health >= 40 -> Amber
+                    else -> Red
+                }
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable { onOpenTeam(team.id) },
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -126,7 +136,20 @@ fun ProfessorDashboardScreen(
                             }
                         }
                         Spacer(Modifier.height(12.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                Modifier
+                                    .background(healthColor.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(Modifier.size(8.dp).background(healthColor, CircleShape))
+                                Spacer(Modifier.width(5.dp))
+                                Text("건강도 $health", fontSize = 12.sp, color = healthColor, fontWeight = FontWeight.Bold)
+                            }
                             InfoChip("팀원 ${team.members.size}명")
                             InfoChip("활동 ${insights.totalLogs}건")
                             InfoChip("평가 ${insights.evalDone}/${team.members.size}")

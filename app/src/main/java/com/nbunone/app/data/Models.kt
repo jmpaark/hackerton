@@ -40,7 +40,8 @@ data class ActivityLog(
     val date: String,
     val category: String,
     val content: String,
-    val hours: Float = 1f
+    val hours: Float = 1f,
+    val mood: String = ""      // 이모지 체크인 (선택)
 )
 
 @Serializable
@@ -81,3 +82,10 @@ data class AppData(
 val LOG_CATEGORIES = listOf("회의", "개발", "자료조사", "문서작성", "발표준비", "기타")
 
 val EVAL_ITEMS = listOf("기여도", "책임감", "협업", "소통")
+
+/** 분위기 체크인 이모지 (점수 5→1) */
+val MOODS = listOf("😄", "🙂", "😐", "😕", "😫")
+
+fun moodScore(mood: String): Int = when (mood) {
+    "😄" -> 5; "🙂" -> 4; "😐" -> 3; "😕" -> 2; "😫" -> 1; else -> 0
+}

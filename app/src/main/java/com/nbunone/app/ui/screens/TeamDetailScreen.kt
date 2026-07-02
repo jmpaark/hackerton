@@ -59,6 +59,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -70,6 +71,7 @@ import com.nbunone.app.data.AppData
 import com.nbunone.app.data.AppRepository
 import com.nbunone.app.data.Artifact
 import com.nbunone.app.data.LOG_CATEGORIES
+import com.nbunone.app.data.MOODS
 import com.nbunone.app.data.PeerEval
 import com.nbunone.app.data.Team
 import com.nbunone.app.data.computeInsights
@@ -89,11 +91,11 @@ private fun today(): String = SimpleDateFormat("yyyy-MM-dd", Locale.KOREA).forma
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TeamDetailScreen(vm: AppViewModel, data: AppData, teamId: String, onBack: () -> Unit) {
+fun TeamDetailScreen(vm: AppViewModel, data: AppData, teamId: String, initialTab: Int = 0, onBack: () -> Unit) {
     val team = data.teams.firstOrNull { it.id == teamId } ?: return
     val user = vm.currentUser as? CurrentUser.Student ?: return
     val myMemberId = team.members.firstOrNull { it.name == user.name }?.id
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by remember { mutableIntStateOf(initialTab.coerceIn(0, 3)) }
     val snackbar = remember { SnackbarHostState() }
 
     Scaffold(
@@ -229,6 +231,7 @@ private fun LogsTab(team: Team, data: AppData, myMemberId: String?) {
     var category by remember { mutableStateOf(LOG_CATEGORIES.first()) }
     var content by remember { mutableStateOf("") }
     var hours by remember { mutableFloatStateOf(1f) }
+    var mood by remember { mutableStateOf("") }
     val logs = data.logs.filter { it.teamId == team.id }.sortedByDescending { it.date }
     val memberById = team.members.associateBy { it.id }
 
@@ -262,14 +265,33 @@ private fun LogsTab(team: Team, data: AppData, myMemberId: String?) {
                         Text("소요 시간: ${hours.trim()}시간", fontSize = 13.sp)
                         Slider(value = hours, onValueChange = { hours = (it * 2).roundToInt() / 2f }, valueRange = 0.5f..8f)
                     }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("오늘 팀플 기분", fontSize = 13.sp)
+                        Spacer(Modifier.width(10.dp))
+                        MOODS.forEach { m ->
+                            val selected = mood == m
+                            Text(
+                                m, fontSize = if (selected) 24.sp else 19.sp,
+                                modifier = Modifier
+                                    .padding(horizontal = 3.dp)
+                                    .background(
+                                        if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable { mood = if (selected) "" else m }
+                                    .padding(4.dp)
+                            )
+                        }
+                    }
                     Button(
                         onClick = {
                             if (myMemberId != null && content.isNotBlank()) {
                                 AppRepository.addLog(
-                                    ActivityLog(AppRepository.newId(), team.id, myMemberId, today(), category, content.trim(), hours)
+                                    ActivityLog(AppRepository.newId(), team.id, myMemberId, today(), category, content.trim(), hours, mood)
                                 )
                                 content = ""
                                 hours = 1f
+                                mood = ""
                             }
                         },
                         enabled = myMemberId != null && content.isNotBlank(),
@@ -294,6 +316,7 @@ private fun LogsTab(team: Team, data: AppData, myMemberId: String?) {
                             Text(member?.name ?: "?", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                             InfoChip(log.category)
                             Text("${log.hours.trim()}h", fontSize = 12.sp, color = Indigo, fontWeight = FontWeight.SemiBold)
+                            if (log.mood.isNotBlank()) Text(log.mood, fontSize = 14.sp)
                         }
                         Text(log.content, fontSize = 13.sp)
                         Text(log.date, fontSize = 11.sp, color = Slate)

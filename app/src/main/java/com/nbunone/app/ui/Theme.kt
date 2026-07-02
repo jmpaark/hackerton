@@ -9,12 +9,45 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.material3.Typography
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
+import com.nbunone.app.R
 import com.nbunone.app.data.FlagType
+
+val Pretendard = FontFamily(
+    Font(R.font.pretendard_regular, FontWeight.Normal),
+    Font(R.font.pretendard_medium, FontWeight.Medium),
+    Font(R.font.pretendard_semibold, FontWeight.SemiBold),
+    Font(R.font.pretendard_bold, FontWeight.Bold),
+    Font(R.font.pretendard_bold, FontWeight.Black)
+)
+
+private val BaseType = Typography()
+val AppTypography = Typography(
+    displayLarge = BaseType.displayLarge.copy(fontFamily = Pretendard),
+    displayMedium = BaseType.displayMedium.copy(fontFamily = Pretendard),
+    displaySmall = BaseType.displaySmall.copy(fontFamily = Pretendard),
+    headlineLarge = BaseType.headlineLarge.copy(fontFamily = Pretendard, fontWeight = FontWeight.Bold),
+    headlineMedium = BaseType.headlineMedium.copy(fontFamily = Pretendard, fontWeight = FontWeight.Bold),
+    headlineSmall = BaseType.headlineSmall.copy(fontFamily = Pretendard, fontWeight = FontWeight.Bold),
+    titleLarge = BaseType.titleLarge.copy(fontFamily = Pretendard, fontWeight = FontWeight.SemiBold),
+    titleMedium = BaseType.titleMedium.copy(fontFamily = Pretendard, fontWeight = FontWeight.SemiBold),
+    titleSmall = BaseType.titleSmall.copy(fontFamily = Pretendard, fontWeight = FontWeight.SemiBold),
+    bodyLarge = BaseType.bodyLarge.copy(fontFamily = Pretendard, letterSpacing = 0.sp),
+    bodyMedium = BaseType.bodyMedium.copy(fontFamily = Pretendard, letterSpacing = 0.sp),
+    bodySmall = BaseType.bodySmall.copy(fontFamily = Pretendard, letterSpacing = 0.sp),
+    labelLarge = BaseType.labelLarge.copy(fontFamily = Pretendard, fontWeight = FontWeight.Medium),
+    labelMedium = BaseType.labelMedium.copy(fontFamily = Pretendard, fontWeight = FontWeight.Medium),
+    labelSmall = BaseType.labelSmall.copy(fontFamily = Pretendard, fontWeight = FontWeight.Medium)
+)
 
 /** 선택 가능한 액센트 컬러 */
 data class Accent(val key: String, val label: String, val light: Color, val dark: Color)
@@ -128,6 +161,6 @@ fun NbunoneTheme(
     }
 
     CompositionLocalProvider(LocalDark provides dark) {
-        MaterialTheme(colorScheme = scheme, content = content)
+        MaterialTheme(colorScheme = scheme, typography = AppTypography, content = content)
     }
 }

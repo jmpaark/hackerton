@@ -1,5 +1,9 @@
 package com.nbunone.app.data
 
+import java.time.LocalDate
+import kotlin.math.abs
+import kotlin.math.roundToInt
+
 enum class FlagType(val label: String, val detail: String) {
     MISMATCH("기록·평가 불일치", "활동 기록은 많지만 동료평가가 낮습니다. 기록의 실질 기여 여부 확인이 필요합니다."),
     FREE_RIDER("참여 저조", "활동 기록과 동료평가가 모두 낮습니다. 무임승차 가능성이 있어 면담을 권장합니다."),
@@ -74,4 +78,44 @@ fun computeInsights(team: Team, allLogs: List<ActivityLog>, allEvals: List<PeerE
     val evalDone = team.members.count { m -> evals.any { it.evaluatorId == m.id } }
 
     return TeamInsights(team, stats, logs.size, teamHours, evalDone, categoryHours)
+}
+
+/** 연속 기록 일수 — 오늘(또는 어제)부터 거슬러 올라가며 센다 */
+fun streakDays(logDates: Set<LocalDate>, today: LocalDate): Int {
+    var day = if (today in logDates) today else today.minusDays(1)
+    var streak = 0
+    while (day in logDates) {
+        streak++
+        day = day.minusDays(1)
+    }
+    return streak
+}
+
+fun parseDateOrNull(s: String): LocalDate? = runCatching { LocalDate.parse(s) }.getOrNull()
+
+/**
+ * 팀 건강도 0~100.
+ * 참여 균형 40점 + 동료평가 제출률 30점 + 최근 7일 활동 멤버 비율 30점
+ */
+fun healthScore(team: Team, logs: List<ActivityLog>, evals: List<PeerEval>, today: LocalDate): Int {
+    val insights = computeInsights(team, logs, evals)
+    val n = team.members.size.coerceAtLeast(1)
+    if (insights.totalLogs == 0) return 0
+
+    // 균형: 완전 균등이면 1, 한 명이 다 하면 0
+    val expected = 1.0 / n
+    val deviation = insights.stats.sumOf { abs(it.logShare - expected) }
+    val maxDeviation = 2.0 * (n - 1) / n
+    val balance = if (maxDeviation > 0) (1.0 - deviation / maxDeviation).coerceIn(0.0, 1.0) else 1.0
+
+    val evalRate = insights.evalDone.toDouble() / n
+
+    val weekAgo = today.minusDays(6)
+    val teamLogs = logs.filter { it.teamId == team.id }
+    val activeMembers = team.members.count { m ->
+        teamLogs.any { it.memberId == m.id && (parseDateOrNull(it.date)?.let { d -> !d.isBefore(weekAgo) } == true) }
+    }
+    val recency = activeMembers.toDouble() / n
+
+    return (balance * 40 + evalRate * 30 + recency * 30).roundToInt().coerceIn(0, 100)
 }

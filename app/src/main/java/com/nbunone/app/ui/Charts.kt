@@ -112,3 +112,51 @@ fun BarRow(label: String, value: Float, max: Float, color: Color, valueText: Str
 
 fun Float.trim(): String =
     if (this == this.toLong().toFloat()) this.toLong().toString() else "%.1f".format(this)
+
+/** GitHub 스타일 기여도 잔디 — 최근 N주, 월요일 시작 */
+@Composable
+fun ContributionHeatmap(
+    hoursByDate: Map<java.time.LocalDate, Float>,
+    modifier: Modifier = Modifier,
+    weeks: Int = 14,
+    accent: Color = MaterialTheme.colorScheme.primary
+) {
+    val today = java.time.LocalDate.now()
+    val thisMonday = today.with(java.time.DayOfWeek.MONDAY)
+    val start = thisMonday.minusWeeks((weeks - 1).toLong())
+    val empty = TrackBg
+
+    Column(modifier) {
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            for (week in 0 until weeks) {
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    for (dayOfWeek in 0..6) {
+                        val date = start.plusDays((week * 7 + dayOfWeek).toLong())
+                        val hours = hoursByDate[date] ?: 0f
+                        val color = when {
+                            date.isAfter(today) -> Color.Transparent
+                            hours <= 0f -> empty
+                            hours < 1f -> accent.copy(alpha = 0.30f)
+                            hours < 3f -> accent.copy(alpha = 0.55f)
+                            hours < 5f -> accent.copy(alpha = 0.80f)
+                            else -> accent
+                        }
+                        Box(
+                            Modifier
+                                .size(13.dp)
+                                .background(color, RoundedCornerShape(3.dp))
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text("적음", fontSize = 10.sp, color = Slate)
+            listOf(empty, accent.copy(alpha = 0.30f), accent.copy(alpha = 0.55f), accent.copy(alpha = 0.80f), accent).forEach {
+                Box(Modifier.size(10.dp).background(it, RoundedCornerShape(2.dp)))
+            }
+            Text("많음", fontSize = 10.sp, color = Slate)
+        }
+    }
+}

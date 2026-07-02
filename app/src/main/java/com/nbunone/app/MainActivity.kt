@@ -53,7 +53,7 @@ fun AppNav() {
             HomeScreen(
                 vm = vm, data = data,
                 onCreateTeam = { nav.navigate("createTeam") },
-                onOpenTeam = { nav.navigate("team/$it") },
+                onOpenTeam = { teamId, tab -> nav.navigate("team/$teamId/$tab") },
                 onLogout = {
                     vm.logout()
                     nav.navigate("login") { popUpTo(0) }
@@ -63,9 +63,10 @@ fun AppNav() {
         composable("createTeam") {
             CreateTeamScreen(vm = vm, onDone = { nav.popBackStack() })
         }
-        composable("team/{teamId}") { entry ->
+        composable("team/{teamId}/{tab}") { entry ->
             val teamId = entry.arguments?.getString("teamId") ?: return@composable
-            TeamDetailScreen(vm = vm, data = data, teamId = teamId, onBack = { nav.popBackStack() })
+            val tab = entry.arguments?.getString("tab")?.toIntOrNull() ?: 0
+            TeamDetailScreen(vm = vm, data = data, teamId = teamId, initialTab = tab, onBack = { nav.popBackStack() })
         }
         composable("prof") {
             ProfessorDashboardScreen(

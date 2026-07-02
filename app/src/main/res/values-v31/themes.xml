@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Nbunone" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#FFFFFF</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <!-- 스플래시: 브랜드 인디고 배경 + 1/N 아이콘 -->
+        <item name="android:windowSplashScreenBackground">#4F46E5</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+    </style>
+</resources>

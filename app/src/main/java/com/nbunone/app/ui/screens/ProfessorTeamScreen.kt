@@ -47,6 +47,9 @@ import com.nbunone.app.AppViewModel
 import com.nbunone.app.data.AppData
 import com.nbunone.app.data.AppRepository
 import com.nbunone.app.data.computeInsights
+import com.nbunone.app.data.moodScore
+import com.nbunone.app.data.parseDateOrNull
+import com.nbunone.app.ui.ContributionHeatmap
 import com.nbunone.app.ui.flagColors
 import com.nbunone.app.ui.Amber
 import com.nbunone.app.ui.BarRow
@@ -154,6 +157,53 @@ fun ProfessorTeamScreen(
                     val maxV = insights.categoryHours.values.max()
                     insights.categoryHours.entries.sortedByDescending { it.value }.forEachIndexed { i, (cat, h) ->
                         BarRow(label = cat, value = h, max = maxV, color = ChartColors[i % ChartColors.size], valueText = "${h.trim()}h")
+                    }
+                }
+            }
+
+            // 팀 활동 잔디
+            val teamLogs = data.logs.filter { it.teamId == teamId }
+            if (teamLogs.isNotEmpty()) {
+                SectionCard(title = "팀 활동 잔디") {
+                    val hoursByDate = teamLogs
+                        .groupBy { parseDateOrNull(it.date) }
+                        .filterKeys { it != null }
+                        .map { (k, v) -> k!! to v.sumOf { it.hours.toDouble() }.toFloat() }
+                        .toMap()
+                    ContributionHeatmap(hoursByDate = hoursByDate)
+                }
+            }
+
+            // 팀 분위기 체크인
+            val moods = teamLogs.filter { it.mood.isNotBlank() }
+                .sortedByDescending { it.date }
+            if (moods.isNotEmpty()) {
+                SectionCard(title = "팀 분위기") {
+                    val avg = moods.map { moodScore(it.mood) }.average().toFloat()
+                    val avgEmoji = when {
+                        avg >= 4.5f -> "😄"; avg >= 3.5f -> "🙂"; avg >= 2.5f -> "😐"
+                        avg >= 1.5f -> "😕"; else -> "😫"
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(avgEmoji, fontSize = 34.sp)
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                "평균 ${"%.1f".format(avg)}/5.0",
+                                fontWeight = FontWeight.Bold, fontSize = 16.sp,
+                                color = if (avg < 2.5f) Red else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text("체크인 ${moods.size}건 기준", fontSize = 12.sp, color = Slate)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("최근: ", fontSize = 12.sp, color = Slate)
+                        Text(moods.take(10).joinToString(" ") { it.mood }, fontSize = 16.sp)
+                    }
+                    if (avg < 2.5f) {
+                        Spacer(Modifier.height(6.dp))
+                        Text("⚠️ 팀 분위기가 낮습니다. 갈등이나 번아웃 조짐일 수 있어요.", fontSize = 12.sp, color = Red)
                     }
                 }
             }

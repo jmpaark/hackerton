@@ -7,10 +7,13 @@ import com.nbunone.app.data.PeerEval
 import com.nbunone.app.data.Seed
 import com.nbunone.app.data.Team
 import com.nbunone.app.data.computeInsights
+import com.nbunone.app.data.healthScore
+import com.nbunone.app.data.streakDays
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
 import kotlin.math.abs
 
 class InsightsTest {
@@ -91,6 +94,38 @@ class InsightsTest {
         val insights = computeInsights(team, logs, emptyList())
         val shareSum = insights.stats.sumOf { it.logShare.toDouble() }
         assertTrue("비중 합=$shareSum", abs(shareSum - 1.0) < 0.001)
+    }
+
+    @Test
+    fun `스트릭 계산 - 오늘 기록 없으면 어제부터 센다`() {
+        val today = LocalDate.of(2026, 7, 2)
+        // 오늘 포함 3일 연속
+        assertEquals(3, streakDays(setOf(today, today.minusDays(1), today.minusDays(2)), today))
+        // 오늘은 아직 안 썼지만 어제까지 2일 연속 → 스트릭 유지
+        assertEquals(2, streakDays(setOf(today.minusDays(1), today.minusDays(2)), today))
+        // 중간에 하루 빠지면 끊김
+        assertEquals(1, streakDays(setOf(today, today.minusDays(2)), today))
+        // 기록 없음
+        assertEquals(0, streakDays(emptySet(), today))
+    }
+
+    @Test
+    fun `팀 건강도 - 균형 잡힌 팀이 몰빵 팀보다 높다`() {
+        val today = LocalDate.of(2026, 7, 2)
+        fun logOn(id: String, who: Member, daysAgo: Long, hours: Float) =
+            ActivityLog(id, team.id, who.id, today.minusDays(daysAgo).toString(), "개발", "x", hours)
+
+        val allEvals = listOf(
+            eval("e1", a, b, 4), eval("e2", b, a, 4), eval("e3", c, a, 4)
+        )
+        val balanced = listOf(logOn("1", a, 1, 5f), logOn("2", b, 2, 5f), logOn("3", c, 1, 5f))
+        val skewed = listOf(logOn("1", a, 1, 14f), logOn("2", b, 2, 0.5f), logOn("3", c, 20, 0.5f))
+
+        val hBalanced = healthScore(team, balanced, allEvals, today)
+        val hSkewed = healthScore(team, skewed, allEvals, today)
+        assertTrue("균형($hBalanced) > 몰빵($hSkewed)", hBalanced > hSkewed)
+        assertTrue(hBalanced in 0..100 && hSkewed in 0..100)
+        assertEquals(0, healthScore(team, emptyList(), emptyList(), today))
     }
 
     @Test
