@@ -1,6 +1,8 @@
 package com.nbunone.app.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,11 +15,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -39,7 +43,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,16 +56,15 @@ import com.nbunone.app.data.computeInsights
 import com.nbunone.app.data.moodScore
 import com.nbunone.app.data.parseDateOrNull
 import com.nbunone.app.data.referenceShares
-import com.nbunone.app.ui.ContributionHeatmap
-import com.nbunone.app.ui.flagColors
-import com.nbunone.app.ui.Amber
 import com.nbunone.app.ui.BarRow
 import com.nbunone.app.ui.ChartColors
+import com.nbunone.app.ui.ContributionHeatmap
 import com.nbunone.app.ui.DonutChart
 import com.nbunone.app.ui.Green
 import com.nbunone.app.ui.Indigo
 import com.nbunone.app.ui.Red
 import com.nbunone.app.ui.Slate
+import com.nbunone.app.ui.flagColors
 import com.nbunone.app.ui.trim
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -75,6 +80,9 @@ fun ProfessorTeamScreen(
     val insights = computeInsights(team, data.logs, data.evals)
     val hasReport = data.reports.any { it.teamId == teamId }
     var comment by remember(teamId) { mutableStateOf(team.professorComment) }
+    var showDetails by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -82,7 +90,11 @@ fun ProfessorTeamScreen(
                 title = {
                     Column {
                         Text(team.name, fontWeight = FontWeight.Bold)
-                        Text(team.projectName, fontSize = 12.sp, color = Slate)
+                        val courseName = data.courses.firstOrNull { it.id == team.courseId }?.name
+                        Text(
+                            if (courseName != null) "${team.projectName} · $courseName" else team.projectName,
+                            fontSize = 12.sp, color = Slate
+                        )
                     }
                 },
                 navigationIcon = {
@@ -101,7 +113,7 @@ fun ProfessorTeamScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // ⚠️ 확인 필요 플래그
+            // ⚠️ 확인 필요 플래그 — 가장 먼저
             insights.stats.filter { it.flag != null }.forEach { s ->
                 val flag = s.flag!!
                 val (bg, fg) = flagColors(flag)
@@ -121,7 +133,38 @@ fun ProfessorTeamScreen(
                 }
             }
 
-            // 활동 시간 분포 도넛
+            // 결론: 참고 기여도 (성적 입력용 복사 지원)
+            if (insights.totalLogs > 0 || insights.evalDone > 0) {
+                val shares = referenceShares(insights).sortedByDescending { it.second }
+                SectionCard(title = "참고 기여도 (활동 60% · 동료평가 40%)") {
+                    shares.forEachIndexed { i, (member, pct) ->
+                        BarRow(
+                            label = member.name, value = pct.toFloat(), max = 100f,
+                            color = ChartColors[i % ChartColors.size], valueText = "$pct%"
+                        )
+                    }
+                    Text(
+                        "※ 확정 점수가 아닌 참고 수치입니다. 최종 판단은 교수자에게 있습니다.",
+                        fontSize = 11.sp, color = Slate
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedButton(onClick = {
+                        val text = buildString {
+                            appendLine("[${team.name}] 참고 기여도 (활동 60%·동료평가 40%)")
+                            shares.forEach { (m, pct) -> appendLine("${m.name}: $pct%") }
+                            append("- N분의1 앱 · 참고 수치")
+                        }
+                        clipboard.setText(AnnotatedString(text))
+                        Toast.makeText(context, "클립보드에 복사했어요 — 성적 입력 시 붙여넣기", Toast.LENGTH_SHORT).show()
+                    }) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("복사", fontSize = 13.sp)
+                    }
+                }
+            }
+
+            // 활동 시간 분포
             SectionCard(title = "활동 시간 분포") {
                 DonutChart(entries = insights.stats.map { it.member.name to it.totalHours })
             }
@@ -138,10 +181,7 @@ fun ProfessorTeamScreen(
                             else -> Red
                         }
                         BarRow(
-                            label = s.member.name,
-                            value = s.evalAvg,
-                            max = 5f,
-                            color = color,
+                            label = s.member.name, value = s.evalAvg, max = 5f, color = color,
                             valueText = if (s.evalCount > 0) "%.1f".format(s.evalAvg) else "-"
                         )
                     }
@@ -149,103 +189,6 @@ fun ProfessorTeamScreen(
                         "평가 제출: ${insights.evalDone}/${team.members.size}명 · 익명 집계",
                         fontSize = 11.sp, color = Slate
                     )
-                }
-            }
-
-            // 참고 기여도 (필수 기능 6: 기여도 참고 점수 시각화)
-            if (insights.totalLogs > 0 || insights.evalDone > 0) {
-                SectionCard(title = "참고 기여도 (활동 60% · 동료평가 40%)") {
-                    referenceShares(insights).sortedByDescending { it.second }.forEachIndexed { i, (member, pct) ->
-                        BarRow(
-                            label = member.name,
-                            value = pct.toFloat(),
-                            max = 100f,
-                            color = ChartColors[i % ChartColors.size],
-                            valueText = "$pct%"
-                        )
-                    }
-                    Text(
-                        "※ 확정 점수가 아닌 참고 수치입니다. 최종 판단은 교수자에게 있습니다.",
-                        fontSize = 11.sp, color = Slate
-                    )
-                }
-            }
-
-            // 활동 유형별
-            if (insights.categoryHours.isNotEmpty()) {
-                SectionCard(title = "활동 유형별 시간") {
-                    val maxV = insights.categoryHours.values.max()
-                    insights.categoryHours.entries.sortedByDescending { it.value }.forEachIndexed { i, (cat, h) ->
-                        BarRow(label = cat, value = h, max = maxV, color = ChartColors[i % ChartColors.size], valueText = "${h.trim()}h")
-                    }
-                }
-            }
-
-            // 팀 활동 잔디
-            val teamLogs = data.logs.filter { it.teamId == teamId }
-            if (teamLogs.isNotEmpty()) {
-                SectionCard(title = "팀 활동 잔디") {
-                    val hoursByDate = teamLogs
-                        .groupBy { parseDateOrNull(it.date) }
-                        .filterKeys { it != null }
-                        .map { (k, v) -> k!! to v.sumOf { it.hours.toDouble() }.toFloat() }
-                        .toMap()
-                    ContributionHeatmap(hoursByDate = hoursByDate)
-                }
-            }
-
-            // 팀 분위기 체크인
-            val moods = teamLogs.filter { it.mood.isNotBlank() }
-                .sortedByDescending { it.date }
-            if (moods.isNotEmpty()) {
-                SectionCard(title = "팀 분위기") {
-                    val avg = moods.map { moodScore(it.mood) }.average().toFloat()
-                    val avgEmoji = when {
-                        avg >= 4.5f -> "😄"; avg >= 3.5f -> "🙂"; avg >= 2.5f -> "😐"
-                        avg >= 1.5f -> "😕"; else -> "😫"
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(avgEmoji, fontSize = 34.sp)
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                "평균 ${"%.1f".format(avg)}/5.0",
-                                fontWeight = FontWeight.Bold, fontSize = 16.sp,
-                                color = if (avg < 2.5f) Red else MaterialTheme.colorScheme.onSurface
-                            )
-                            Text("체크인 ${moods.size}건 기준", fontSize = 12.sp, color = Slate)
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("최근: ", fontSize = 12.sp, color = Slate)
-                        Text(moods.take(10).joinToString(" ") { it.mood }, fontSize = 16.sp)
-                    }
-                    if (avg < 2.5f) {
-                        Spacer(Modifier.height(6.dp))
-                        Text("⚠️ 팀 분위기가 낮습니다. 갈등이나 번아웃 조짐일 수 있어요.", fontSize = 12.sp, color = Red)
-                    }
-                }
-            }
-
-            // 팀이 수집한 설문 결과
-            val surveys = data.surveys.filter { it.teamId == teamId }
-            if (surveys.isNotEmpty()) {
-                SectionCard(title = "팀 설문 결과 (${surveys.size}건)") {
-                    surveys.forEach { survey ->
-                        Text("Q. ${survey.question}", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                        Text("응답 ${survey.total}건", fontSize = 11.sp, color = Slate)
-                        val maxCount = (survey.counts.maxOrNull() ?: 1).coerceAtLeast(1)
-                        survey.options.forEachIndexed { i, opt ->
-                            BarRow(
-                                label = opt, value = survey.counts[i].toFloat(),
-                                max = maxCount.toFloat(),
-                                color = ChartColors[i % ChartColors.size],
-                                valueText = "${survey.counts[i]}"
-                            )
-                        }
-                        Spacer(Modifier.height(10.dp))
-                    }
                 }
             }
 
@@ -262,51 +205,147 @@ fun ProfessorTeamScreen(
                 }
             }
 
-            // GitHub 커밋 분석
-            if (team.githubUrl.isNotBlank()) {
-                SectionCard(title = "GitHub 커밋 분석") {
-                    val stats = vm.githubStats[teamId]
-                    when {
-                        vm.githubLoadingTeam == teamId -> {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                Spacer(Modifier.width(10.dp))
-                                Text("커밋 내역을 분석하는 중...", fontSize = 13.sp, color = Slate)
+            // ── 상세 분석 (접이식) ──
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().clickable { showDetails = !showDetails }.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("상세 분석", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text("활동 유형 · 잔디 · 분위기 · 설문 · GitHub", fontSize = 11.sp, color = Slate)
+                    }
+                    Icon(
+                        if (showDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = null, tint = Slate
+                    )
+                }
+            }
+
+            if (showDetails) {
+                // 활동 유형별
+                if (insights.categoryHours.isNotEmpty()) {
+                    SectionCard(title = "활동 유형별 시간") {
+                        val maxV = insights.categoryHours.values.max()
+                        insights.categoryHours.entries.sortedByDescending { it.value }.forEachIndexed { i, (cat, h) ->
+                            BarRow(label = cat, value = h, max = maxV, color = ChartColors[i % ChartColors.size], valueText = "${h.trim()}h")
+                        }
+                    }
+                }
+
+                // 팀 활동 잔디
+                val teamLogs = data.logs.filter { it.teamId == teamId }
+                if (teamLogs.isNotEmpty()) {
+                    SectionCard(title = "팀 활동 잔디") {
+                        val hoursByDate = teamLogs
+                            .groupBy { parseDateOrNull(it.date) }
+                            .filterKeys { it != null }
+                            .map { (k, v) -> k!! to v.sumOf { it.hours.toDouble() }.toFloat() }
+                            .toMap()
+                        ContributionHeatmap(hoursByDate = hoursByDate)
+                    }
+                }
+
+                // 팀 분위기
+                val moods = teamLogs.filter { it.mood.isNotBlank() }.sortedByDescending { it.date }
+                if (moods.isNotEmpty()) {
+                    SectionCard(title = "팀 분위기") {
+                        val avg = moods.map { moodScore(it.mood) }.average().toFloat()
+                        val avgEmoji = when {
+                            avg >= 4.5f -> "😄"; avg >= 3.5f -> "🙂"; avg >= 2.5f -> "😐"
+                            avg >= 1.5f -> "😕"; else -> "😫"
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(avgEmoji, fontSize = 34.sp)
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    "평균 ${"%.1f".format(avg)}/5.0",
+                                    fontWeight = FontWeight.Bold, fontSize = 16.sp,
+                                    color = if (avg < 2.5f) Red else MaterialTheme.colorScheme.onSurface
+                                )
+                                Text("체크인 ${moods.size}건 기준", fontSize = 12.sp, color = Slate)
                             }
                         }
-                        stats != null -> {
-                            Text(
-                                "${stats.repo} · 최근 ${stats.totalCommits}개 커밋",
-                                fontSize = 12.sp, color = Slate
-                            )
+                        Spacer(Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("최근: ", fontSize = 12.sp, color = Slate)
+                            Text(moods.take(10).joinToString(" ") { it.mood }, fontSize = 16.sp)
+                        }
+                        if (avg < 2.5f) {
                             Spacer(Modifier.height(6.dp))
-                            val maxC = stats.byAuthor.maxOfOrNull { it.second } ?: 1
-                            stats.byAuthor.take(6).forEachIndexed { i, (author, count) ->
+                            Text("⚠️ 팀 분위기가 낮습니다. 갈등이나 번아웃 조짐일 수 있어요.", fontSize = 12.sp, color = Red)
+                        }
+                    }
+                }
+
+                // 설문 결과
+                val surveys = data.surveys.filter { it.teamId == teamId }
+                if (surveys.isNotEmpty()) {
+                    SectionCard(title = "팀 설문 결과 (${surveys.size}건)") {
+                        surveys.forEach { survey ->
+                            Text("Q. ${survey.question}", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text("응답 ${survey.total}건", fontSize = 11.sp, color = Slate)
+                            val maxCount = (survey.counts.maxOrNull() ?: 1).coerceAtLeast(1)
+                            survey.options.forEachIndexed { i, opt ->
                                 BarRow(
-                                    label = author, value = count.toFloat(), max = maxC.toFloat(),
-                                    color = ChartColors[i % ChartColors.size], valueText = "${count}건"
+                                    label = opt, value = survey.counts[i].toFloat(),
+                                    max = maxCount.toFloat(),
+                                    color = ChartColors[i % ChartColors.size],
+                                    valueText = "${survey.counts[i]}"
                                 )
                             }
-                            OutlinedButton(onClick = { vm.analyzeGithub(teamId, team.githubUrl) }) {
-                                Text("다시 분석")
-                            }
+                            Spacer(Modifier.height(10.dp))
                         }
-                        else -> {
-                            Text(team.githubUrl, fontSize = 12.sp, color = Slate)
-                            Spacer(Modifier.height(6.dp))
-                            vm.githubError?.let {
-                                Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
-                                Spacer(Modifier.height(6.dp))
+                    }
+                }
+
+                // GitHub 커밋 분석
+                if (team.githubUrl.isNotBlank()) {
+                    SectionCard(title = "GitHub 커밋 분석") {
+                        val stats = vm.githubStats[teamId]
+                        when {
+                            vm.githubLoadingTeam == teamId -> {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    Spacer(Modifier.width(10.dp))
+                                    Text("커밋 내역을 분석하는 중...", fontSize = 13.sp, color = Slate)
+                                }
                             }
-                            OutlinedButton(onClick = { vm.analyzeGithub(teamId, team.githubUrl) }) {
-                                Text("커밋 기여 분석하기")
+                            stats != null -> {
+                                Text("${stats.repo} · 최근 ${stats.totalCommits}개 커밋", fontSize = 12.sp, color = Slate)
+                                Spacer(Modifier.height(6.dp))
+                                val maxC = stats.byAuthor.maxOfOrNull { it.second } ?: 1
+                                stats.byAuthor.take(6).forEachIndexed { i, (author, count) ->
+                                    BarRow(
+                                        label = author, value = count.toFloat(), max = maxC.toFloat(),
+                                        color = ChartColors[i % ChartColors.size], valueText = "${count}건"
+                                    )
+                                }
+                                OutlinedButton(onClick = { vm.analyzeGithub(teamId, team.githubUrl) }) {
+                                    Text("다시 분석")
+                                }
+                            }
+                            else -> {
+                                Text(team.githubUrl, fontSize = 12.sp, color = Slate)
+                                Spacer(Modifier.height(6.dp))
+                                vm.githubError?.let {
+                                    Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                                    Spacer(Modifier.height(6.dp))
+                                }
+                                OutlinedButton(onClick = { vm.analyzeGithub(teamId, team.githubUrl) }) {
+                                    Text("커밋 기여 분석하기")
+                                }
                             }
                         }
                     }
                 }
             }
 
-            // 교수자 코멘트
+            // 교수자 메모
             SectionCard(title = "교수자 메모") {
                 OutlinedTextField(
                     value = comment,

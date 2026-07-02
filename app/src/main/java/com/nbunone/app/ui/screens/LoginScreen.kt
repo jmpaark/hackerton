@@ -51,7 +51,6 @@ import com.nbunone.app.ui.Slate
 fun LoginScreen(vm: AppViewModel, data: AppData, onLoggedIn: (isProfessor: Boolean) -> Unit) {
     var name by remember { mutableStateOf("") }
     var role by remember { mutableStateOf("student") }
-    val knownNames = data.teams.flatMap { t -> t.members.map { it.name } }.distinct()
     val primary = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
 
@@ -119,25 +118,11 @@ fun LoginScreen(vm: AppViewModel, data: AppData, onLoggedIn: (isProfessor: Boole
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("이름") },
+                    placeholder = { Text("팀에서 사용할 이름을 입력하세요") },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
-                if (knownNames.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
-                    ) {
-                        knownNames.take(4).forEach { n ->
-                            AssistChip(
-                                onClick = { name = n },
-                                label = { Text(n) },
-                                shape = RoundedCornerShape(20.dp)
-                            )
-                        }
-                    }
-                }
                 Spacer(Modifier.height(16.dp))
             }
 

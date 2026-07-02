@@ -30,6 +30,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.Button
@@ -149,6 +151,8 @@ private fun OverviewTab(team: Team, data: AppData, myMemberId: String?, onGoToTa
     var showAddMember by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
     var newRole by remember { mutableStateOf("") }
+    var showGithub by remember { mutableStateOf(false) }
+    var showSurvey by remember { mutableStateOf(false) }
 
     // 다음 할 일 계산
     val myLogCount = if (myMemberId != null) data.logs.count { it.teamId == team.id && it.memberId == myMemberId } else 0
@@ -291,30 +295,64 @@ private fun OverviewTab(team: Team, data: AppData, myMemberId: String?, onGoToTa
         }
 
         Spacer(Modifier.height(4.dp))
-        Text("GitHub 저장소", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-        ) {
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("저장소를 등록하면 교수님 화면에서 커밋 기여 분석을 볼 수 있어요", fontSize = 12.sp, color = Slate)
-                OutlinedTextField(
-                    value = github,
-                    onValueChange = { github = it },
-                    label = { Text("https://github.com/...") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedButton(onClick = { AppRepository.setGithubUrl(team.id, github.trim()) }) {
-                    Text(if (team.githubUrl == github.trim() && github.isNotBlank()) "저장됨 ✓" else "저장")
+        CollapsibleHeader(
+            title = "GitHub 저장소",
+            subtitle = if (team.githubUrl.isBlank()) "등록하면 커밋 기여 분석 가능" else "등록됨 ✓",
+            expanded = showGithub
+        ) { showGithub = !showGithub }
+        if (showGithub) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("저장소를 등록하면 교수님 화면에서 커밋 기여 분석을 볼 수 있어요", fontSize = 12.sp, color = Slate)
+                    OutlinedTextField(
+                        value = github,
+                        onValueChange = { github = it },
+                        label = { Text("https://github.com/...") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedButton(onClick = { AppRepository.setGithubUrl(team.id, github.trim()) }) {
+                        Text(if (team.githubUrl == github.trim() && github.isNotBlank()) "저장됨 ✓" else "저장")
+                    }
                 }
             }
         }
 
-        Spacer(Modifier.height(4.dp))
-        Text("팀 설문", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        SurveySection(team = team, data = data, myMemberId = myMemberId)
+        val surveyCount = data.surveys.count { it.teamId == team.id }
+        CollapsibleHeader(
+            title = "팀 설문",
+            subtitle = if (surveyCount > 0) "${surveyCount}건 · 에브리타임 공유 가능" else "설문 만들고 커뮤니티에 공유",
+            expanded = showSurvey
+        ) { showSurvey = !showSurvey }
+        if (showSurvey) {
+            SurveySection(team = team, data = data, myMemberId = myMemberId)
+        }
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun CollapsibleHeader(title: String, subtitle: String, expanded: Boolean, onToggle: () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(subtitle, fontSize = 11.sp, color = Slate)
+            }
+            Icon(
+                if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = null, tint = Slate
+            )
+        }
     }
 }
 

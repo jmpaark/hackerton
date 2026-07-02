@@ -22,10 +22,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.HowToVote
 import androidx.compose.material.icons.filled.LibraryAdd
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,7 +38,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -119,161 +118,170 @@ fun HomeScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // ── 빠른 실행 ──
-            item {
-                Text("빠른 실행", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    QuickAction(
-                        icon = Icons.Default.EditNote, label = "활동 기록",
-                        enabled = firstTeam != null,
-                        modifier = Modifier.weight(1f)
-                    ) { firstTeam?.let { onOpenTeam(it.id, 2) } }
-                    QuickAction(
-                        icon = Icons.Default.HowToVote, label = "동료평가",
-                        enabled = firstTeam != null,
-                        modifier = Modifier.weight(1f)
-                    ) { firstTeam?.let { onOpenTeam(it.id, 3) } }
-                }
-                Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    QuickAction(
-                        icon = Icons.Default.Description, label = "산출물",
-                        enabled = firstTeam != null,
-                        modifier = Modifier.weight(1f)
-                    ) { firstTeam?.let { onOpenTeam(it.id, 4) } }
-                    QuickAction(
-                        icon = Icons.Default.LibraryAdd, label = "팀 만들기",
-                        enabled = true,
-                        modifier = Modifier.weight(1f)
-                    ) { onCreateTeam() }
-                }
-            }
-
-            // ── 다가오는 마감 (미니 LMS) ──
-            item {
-                val today = LocalDate.now()
-                val upcoming = myTeams.flatMap { team ->
-                    data.milestones
-                        .filter { it.courseId == team.courseId && team.courseId.isNotBlank() }
-                        .filter { m -> data.submissions.none { it.milestoneId == m.id && it.teamId == team.id } }
-                        .mapNotNull { m ->
-                            val due = parseDateOrNull(m.dueDate) ?: return@mapNotNull null
-                            if (due.isBefore(today.minusDays(7))) null else Triple(team, m, due)
-                        }
-                }.sortedBy { it.third }.take(2)
-
-                if (upcoming.isNotEmpty()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text("다가오는 마감", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Spacer(Modifier.height(10.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        upcoming.forEach { (team, m, due) ->
-                            val overdue = due.isBefore(today)
-                            val soon = !overdue && !due.isAfter(today.plusDays(3))
-                            val badgeColor = when {
-                                overdue -> MaterialTheme.colorScheme.error
-                                soon -> Amber
-                                else -> MaterialTheme.colorScheme.primary
-                            }
-                            Card(
-                                modifier = Modifier.fillMaxWidth().clickable { onOpenTeam(team.id, 1) },
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            if (myTeams.isEmpty()) {
+                // ── 첫 시작: 팀 만들기 하나에 집중 ──
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(
+                                Modifier.size(64.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text("📌", fontSize = 18.sp)
-                                    Spacer(Modifier.width(10.dp))
-                                    Column(Modifier.weight(1f)) {
-                                        Text(m.title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                                        Text("${team.name} · 마감 ${m.dueDate}", fontSize = 12.sp, color = Slate)
-                                    }
-                                    Box(
-                                        Modifier.background(badgeColor.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
-                                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                                    ) {
-                                        Text(
-                                            dDayLabel(m.dueDate, today),
-                                            fontSize = 12.sp, fontWeight = FontWeight.Bold, color = badgeColor
-                                        )
+                                Icon(
+                                    Icons.Default.LibraryAdd, contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(30.dp)
+                                )
+                            }
+                            Spacer(Modifier.height(14.dp))
+                            Text("팀 만들기부터 시작해요", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "팀을 만들고 팀원을 등록하면\n기록·평가·리포트가 차례로 열립니다",
+                                fontSize = 13.sp, color = Slate,
+                                lineHeight = 19.sp
+                            )
+                            Spacer(Modifier.height(18.dp))
+                            Button(
+                                onClick = onCreateTeam,
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.fillMaxWidth().height(52.dp)
+                            ) { Text("팀 만들기", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
+                        }
+                    }
+                }
+                item {
+                    Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        listOf(
+                            "1" to "팀 만들기 — 팀원과 역할을 등록해요",
+                            "2" to "활동 기록 — 매일 한 일을 남겨요",
+                            "3" to "동료평가 — 프로젝트가 끝나면 서로 평가해요"
+                        ).forEach { (num, text) ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    Modifier.size(22.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(num, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                }
+                                Spacer(Modifier.width(10.dp))
+                                Text(text, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                        Text(
+                            "이미 팀이 있다면? 팀장에게 내 이름(로그인 이름과 동일)으로 등록을 요청하세요",
+                            fontSize = 11.sp, color = Slate
+                        )
+                    }
+                }
+            } else {
+                // ── 다가오는 마감 ──
+                item {
+                    val today = LocalDate.now()
+                    val upcoming = myTeams.flatMap { team ->
+                        data.milestones
+                            .filter { it.courseId == team.courseId && team.courseId.isNotBlank() }
+                            .filter { m -> data.submissions.none { it.milestoneId == m.id && it.teamId == team.id } }
+                            .mapNotNull { m ->
+                                val due = parseDateOrNull(m.dueDate) ?: return@mapNotNull null
+                                if (due.isBefore(today.minusDays(7))) null else Triple(team, m, due)
+                            }
+                    }.sortedBy { it.third }.take(2)
+
+                    if (upcoming.isNotEmpty()) {
+                        Text("다가오는 마감", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Spacer(Modifier.height(10.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            upcoming.forEach { (team, m, due) ->
+                                val overdue = due.isBefore(today)
+                                val soon = !overdue && !due.isAfter(today.plusDays(3))
+                                val badgeColor = when {
+                                    overdue -> MaterialTheme.colorScheme.error
+                                    soon -> Amber
+                                    else -> MaterialTheme.colorScheme.primary
+                                }
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().clickable { onOpenTeam(team.id, 1) },
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                                ) {
+                                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Text("📌", fontSize = 18.sp)
+                                        Spacer(Modifier.width(10.dp))
+                                        Column(Modifier.weight(1f)) {
+                                            Text(m.title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                            Text("${team.name} · 마감 ${m.dueDate}", fontSize = 12.sp, color = Slate)
+                                        }
+                                        Box(
+                                            Modifier.background(badgeColor.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
+                                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(
+                                                dDayLabel(m.dueDate, today),
+                                                fontSize = 12.sp, fontWeight = FontWeight.Bold, color = badgeColor
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            // ── 내 기여도 잔디 ──
-            item {
-                Spacer(Modifier.height(4.dp))
-                Text("내 기여도 잔디", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Spacer(Modifier.height(10.dp))
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                ) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                        val hoursByDate = myLogs
-                            .groupBy { parseDateOrNull(it.date) }
-                            .filterKeys { it != null }
-                            .map { (k, v) -> k!! to v.sumOf { it.hours.toDouble() }.toFloat() }
-                            .toMap()
-                        ContributionHeatmap(hoursByDate = hoursByDate)
-                        Spacer(Modifier.height(10.dp))
-                        Text(
-                            "총 ${myLogs.size}건 · ${"%.1f".format(myLogs.sumOf { it.hours.toDouble() })}시간의 기여가 기록되어 있어요",
-                            fontSize = 12.sp, color = Slate
-                        )
+                // ── 빠른 실행 ──
+                item {
+                    Text("빠른 실행", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        QuickAction(Icons.Default.EditNote, "활동 기록", Modifier.weight(1f)) {
+                            firstTeam?.let { onOpenTeam(it.id, 2) }
+                        }
+                        QuickAction(Icons.Default.HowToVote, "동료평가", Modifier.weight(1f)) {
+                            firstTeam?.let { onOpenTeam(it.id, 3) }
+                        }
+                        QuickAction(Icons.Default.Description, "산출물", Modifier.weight(1f)) {
+                            firstTeam?.let { onOpenTeam(it.id, 4) }
+                        }
+                        QuickAction(Icons.Default.LibraryAdd, "팀 추가", Modifier.weight(1f)) {
+                            onCreateTeam()
+                        }
                     }
                 }
-            }
 
-            // ── 내 팀 ──
-            item {
-                Spacer(Modifier.height(4.dp))
-                Text("내 팀", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            }
-            if (myTeams.isEmpty()) {
+                // ── 내 팀 ──
                 item {
+                    Spacer(Modifier.height(4.dp))
+                    Text("내 팀", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+                items(myTeams) { team ->
+                    TeamCard(team = team, data = data, onClick = { onOpenTeam(team.id, 0) })
+                }
+
+                // ── 내 기여도 잔디 ──
+                item {
+                    Spacer(Modifier.height(4.dp))
+                    Text("내 기여도 잔디", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Spacer(Modifier.height(10.dp))
                     Card(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                     ) {
-                        Column(Modifier.fillMaxWidth().padding(20.dp)) {
-                            Text("🚀 이렇게 시작하세요", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                            Spacer(Modifier.height(12.dp))
-                            listOf(
-                                "1" to "팀을 만들고 팀원과 역할을 등록해요",
-                                "2" to "매일 한 일을 활동 로그로 남겨요",
-                                "3" to "프로젝트가 끝나면 서로 동료평가를 해요",
-                                "4" to "교수님은 근거와 함께 기여도를 확인해요"
-                            ).forEach { (num, text) ->
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(vertical = 5.dp)
-                                ) {
-                                    Box(
-                                        Modifier.size(22.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(num, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                    }
-                                    Spacer(Modifier.width(10.dp))
-                                    Text(text, fontSize = 13.sp)
-                                }
-                            }
-                            Spacer(Modifier.height(6.dp))
+                        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                            val hoursByDate = myLogs
+                                .groupBy { parseDateOrNull(it.date) }
+                                .filterKeys { it != null }
+                                .map { (k, v) -> k!! to v.sumOf { it.hours.toDouble() }.toFloat() }
+                                .toMap()
+                            ContributionHeatmap(hoursByDate = hoursByDate)
+                            Spacer(Modifier.height(10.dp))
                             Text(
-                                "팀원이라면? 팀장에게 내 이름(로그인 이름과 동일)으로 등록을 요청하세요",
-                                fontSize = 11.sp, color = Slate
+                                "총 ${myLogs.size}건 · ${"%.1f".format(myLogs.sumOf { it.hours.toDouble() })}시간의 기여가 기록되어 있어요",
+                                fontSize = 12.sp, color = Slate
                             )
                         }
                     }
-                }
-            } else {
-                items(myTeams) { team ->
-                    TeamCard(team = team, data = data, onClick = { onOpenTeam(team.id, 0) })
                 }
             }
         }
@@ -284,30 +292,23 @@ fun HomeScreen(
 private fun QuickAction(
     icon: ImageVector,
     label: String,
-    enabled: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     Card(
-        modifier = modifier.clickable(enabled = enabled, onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = if (enabled) MaterialTheme.colorScheme.surface
-            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (enabled) 1.dp else 0.dp)
+        modifier = modifier.clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(Modifier.fillMaxWidth().padding(vertical = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.fillMaxWidth().padding(vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
-                Modifier.size(42.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                Modifier.size(38.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, contentDescription = label, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                Icon(icon, contentDescription = label, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                color = if (enabled) MaterialTheme.colorScheme.onSurface else Slate
-            )
+            Spacer(Modifier.height(6.dp))
+            Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
@@ -332,7 +333,11 @@ private fun TeamCard(team: Team, data: AppData, onClick: () -> Unit) {
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(team.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text(team.projectName, color = Slate, fontSize = 13.sp)
+                    val courseName = data.courses.firstOrNull { it.id == team.courseId }?.name
+                    Text(
+                        if (courseName != null) "${team.projectName} · $courseName" else team.projectName,
+                        color = Slate, fontSize = 13.sp
+                    )
                 }
             }
             Spacer(Modifier.height(12.dp))
