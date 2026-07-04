@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -82,10 +81,20 @@ fun LoginScreen(vm: AppViewModel, data: AppData, onLoggedIn: (isProfessor: Boole
                         Brush.linearGradient(listOf(primary, primary.copy(alpha = 0.75f))),
                         RoundedCornerShape(28.dp)
                     )
-                    .pointerInput(Unit) {
+                    .pointerInput(role) {
                         detectTapGestures(onLongPress = {
+                            // 숨김 데모 제스처: 시드 데이터 로드 후 선택된 역할로 바로 입장
                             AppRepository.loadSeedData()
-                            Toast.makeText(context, "데모 데이터를 불러왔어요", Toast.LENGTH_SHORT).show()
+                            if (role == "professor") {
+                                vm.login(CurrentUser.Professor)
+                                Toast.makeText(context, "데모 · 교수님으로 입장합니다", Toast.LENGTH_SHORT).show()
+                                onLoggedIn(true)
+                            } else {
+                                // 시드의 팀장 '소이'로 입장 → 데이터가 채워진 팀 화면을 바로 볼 수 있음
+                                vm.login(CurrentUser.Student("소이"))
+                                Toast.makeText(context, "데모 · 소이(팀장)으로 입장합니다", Toast.LENGTH_SHORT).show()
+                                onLoggedIn(false)
+                            }
                         })
                     },
                 contentAlignment = Alignment.Center

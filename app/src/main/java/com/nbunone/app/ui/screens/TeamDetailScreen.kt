@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -464,6 +465,13 @@ private fun SurveySection(team: Team, data: AppData, myMemberId: String?) {
     }
 }
 
+private const val EVERYTIME_PACKAGE = "com.everytime.v2"
+
+/**
+ * 에브리타임 실제 연동.
+ * 에타는 공개 API가 없으므로 (1) 설문 내용을 클립보드에 복사하고
+ * (2) 에타 앱이 설치돼 있으면 앱으로 바로 공유/실행, (3) 없으면 스토어/일반 공유로 폴백한다.
+ */
 private fun shareSurvey(context: Context, teamName: String, survey: com.nbunone.app.data.Survey) {
     val text = buildString {
         appendLine("📊 [$teamName 팀] 설문 부탁드려요!")
@@ -471,14 +479,60 @@ private fun shareSurvey(context: Context, teamName: String, survey: com.nbunone.
         appendLine("Q. ${survey.question}")
         survey.options.forEachIndexed { i, opt -> appendLine("${i + 1}) $opt") }
         appendLine()
-        append("댓글로 번호를 남겨주세요 🙏")
+        append("댓글로 번호를 남겨주세요 🙏 (N분의1 앱)")
     }
+
+    // 1) 클립보드 복사 — 에타 글쓰기 창에 바로 붙여넣을 수 있게
     runCatching {
-        val intent = Intent(Intent.ACTION_SEND).apply {
+        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        cm.setPrimaryClip(android.content.ClipData.newPlainText("N분의1 설문", text))
+    }
+
+    val pm = context.packageManager
+    val everytimeLaunch = pm.getLaunchIntentForPackage(EVERYTIME_PACKAGE)
+
+    // 2) 에브리타임 설치됨 → 앱으로 직접 공유 시도 (실패 시 앱 실행)
+    if (everytimeLaunch != null) {
+        val sendToEverytime = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, text)
+            setPackage(EVERYTIME_PACKAGE)
         }
-        context.startActivity(Intent.createChooser(intent, "설문 공유"))
+        val ok = runCatching { context.startActivity(sendToEverytime); true }.getOrElse {
+            // 에타가 공유(SEND)를 안 받으면 앱만 열고 붙여넣기 안내
+            runCatching { context.startActivity(everytimeLaunch); true }.getOrDefault(false)
+        }
+        if (ok) {
+            Toast.makeText(context, "설문 내용을 복사했어요 · 에브리타임에서 붙여넣기 하세요", Toast.LENGTH_LONG).show()
+            return
+        }
+    }
+
+    // 3) 에타 미설치 → 스토어로 유도 (설치 후 붙여넣기)
+    val store = runCatching {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$EVERYTIME_PACKAGE"))
+        ); true
+    }.getOrElse {
+        runCatching {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$EVERYTIME_PACKAGE"))
+            ); true
+        }.getOrDefault(false)
+    }
+    if (store) {
+        Toast.makeText(context, "에브리타임이 없어요 · 설치 후 붙여넣으면 돼요 (내용 복사됨)", Toast.LENGTH_LONG).show()
+        return
+    }
+
+    // 4) 최후 폴백 — 일반 공유 시트 (카톡·문자 등)
+    runCatching {
+        context.startActivity(
+            Intent.createChooser(
+                Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, text) },
+                "설문 공유"
+            )
+        )
     }
 }
 
