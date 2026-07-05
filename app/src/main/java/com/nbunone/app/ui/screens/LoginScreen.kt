@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,11 +19,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,10 +38,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nbunone.app.AppViewModel
@@ -52,6 +55,34 @@ fun LoginScreen(vm: AppViewModel, data: AppData, onLoggedIn: (isProfessor: Boole
     var role by remember { mutableStateOf("student") }
     val primary = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
+
+    // 실제 로그인 — 최근 로그인에 기록 후 진입
+    val enter: (Boolean, String) -> Unit = { isProfessor, studentName ->
+        if (isProfessor) {
+            AppRepository.pushRecentLogin("professor", "")
+            vm.login(CurrentUser.Professor)
+            onLoggedIn(true)
+        } else {
+            val n = studentName.trim()
+            AppRepository.pushRecentLogin("student", n)
+            vm.login(CurrentUser.Student(n))
+            onLoggedIn(false)
+        }
+    }
+
+    // 데모 데이터로 둘러보기 (심사·시연용 샘플)
+    val loadDemo: () -> Unit = {
+        AppRepository.loadSeedData()
+        if (role == "professor") {
+            Toast.makeText(context, "데모 · 교수님으로 입장합니다", Toast.LENGTH_SHORT).show()
+            vm.login(CurrentUser.Professor)
+            onLoggedIn(true)
+        } else {
+            Toast.makeText(context, "데모 · 소이(팀장)으로 입장합니다", Toast.LENGTH_SHORT).show()
+            vm.login(CurrentUser.Student("소이"))
+            onLoggedIn(false)
+        }
+    }
 
     Box(
         Modifier
@@ -68,42 +99,59 @@ fun LoginScreen(vm: AppViewModel, data: AppData, onLoggedIn: (isProfessor: Boole
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 28.dp),
+                .padding(horizontal = 28.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             // 로고 — 길게 누르면 데모 데이터 로드 (숨김 제스처)
             Box(
                 Modifier
-                    .size(96.dp)
-                    .shadow(16.dp, RoundedCornerShape(28.dp), spotColor = primary)
+                    .size(88.dp)
+                    .shadow(16.dp, RoundedCornerShape(26.dp), spotColor = primary)
                     .background(
                         Brush.linearGradient(listOf(primary, primary.copy(alpha = 0.75f))),
-                        RoundedCornerShape(28.dp)
+                        RoundedCornerShape(26.dp)
                     )
                     .pointerInput(role) {
-                        detectTapGestures(onLongPress = {
-                            // 숨김 데모 제스처: 시드 데이터 로드 후 선택된 역할로 바로 입장
-                            AppRepository.loadSeedData()
-                            if (role == "professor") {
-                                vm.login(CurrentUser.Professor)
-                                Toast.makeText(context, "데모 · 교수님으로 입장합니다", Toast.LENGTH_SHORT).show()
-                                onLoggedIn(true)
-                            } else {
-                                // 시드의 팀장 '소이'로 입장 → 데이터가 채워진 팀 화면을 바로 볼 수 있음
-                                vm.login(CurrentUser.Student("소이"))
-                                Toast.makeText(context, "데모 · 소이(팀장)으로 입장합니다", Toast.LENGTH_SHORT).show()
-                                onLoggedIn(false)
-                            }
-                        })
+                        detectTapGestures(onLongPress = { loadDemo() })
                     },
                 contentAlignment = Alignment.Center
             ) {
-                Text("1/N", color = MaterialTheme.colorScheme.onPrimary, fontSize = 30.sp, fontWeight = FontWeight.Black)
+                Text("1/N", color = MaterialTheme.colorScheme.onPrimary, fontSize = 28.sp, fontWeight = FontWeight.Black)
             }
-            Spacer(Modifier.height(18.dp))
-            Text("N분의1", fontSize = 30.sp, fontWeight = FontWeight.Black, letterSpacing = (-0.5).sp)
-            Spacer(Modifier.height(40.dp))
+            Spacer(Modifier.height(16.dp))
+            Text("N분의1", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = (-0.5).sp)
+            Spacer(Modifier.height(32.dp))
+
+            // ── 간편 로그인 (최근 로그인 기록이 있을 때) ──
+            if (data.recentLogins.isNotEmpty()) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("간편 로그인", fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                    Text("탭 한 번으로 계속하기", fontSize = 11.sp, color = Slate)
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    data.recentLogins.forEach { rl ->
+                        val isProf = rl.role == "professor"
+                        val label = if (isProf) "교수님" else rl.name.ifBlank { "학생" }
+                        val emoji = if (isProf) "👨‍🏫" else "🎓"
+                        AssistChip(
+                            onClick = { enter(isProf, rl.name) },
+                            label = { Text("$emoji  $label", fontSize = 13.sp) },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            )
+                        )
+                    }
+                }
+                Spacer(Modifier.height(22.dp))
+                Text("또는 새로 시작", fontSize = 11.sp, color = Slate)
+                Spacer(Modifier.height(12.dp))
+            }
 
             // 역할 선택
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -137,13 +185,8 @@ fun LoginScreen(vm: AppViewModel, data: AppData, onLoggedIn: (isProfessor: Boole
 
             Button(
                 onClick = {
-                    if (role == "professor") {
-                        vm.login(CurrentUser.Professor)
-                        onLoggedIn(true)
-                    } else if (name.isNotBlank()) {
-                        vm.login(CurrentUser.Student(name.trim()))
-                        onLoggedIn(false)
-                    }
+                    if (role == "professor") enter(true, "")
+                    else if (name.isNotBlank()) enter(false, name)
                 },
                 enabled = role == "professor" || name.isNotBlank(),
                 shape = RoundedCornerShape(16.dp),
@@ -151,6 +194,15 @@ fun LoginScreen(vm: AppViewModel, data: AppData, onLoggedIn: (isProfessor: Boole
                 modifier = Modifier.fillMaxWidth().height(54.dp)
             ) {
                 Text("시작하기", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = loadDemo,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().height(48.dp)
+            ) {
+                Text("🎬  데모 데이터로 둘러보기 (심사용 샘플)", fontSize = 13.sp)
             }
         }
     }

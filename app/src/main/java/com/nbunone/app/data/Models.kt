@@ -116,6 +116,13 @@ data class Report(
     val isAi: Boolean
 )
 
+/** 최근 로그인 — 간편 로그인용 (역할 + 학생 이름) */
+@Serializable
+data class RecentLogin(
+    val role: String,        // "student" | "professor"
+    val name: String = ""    // 학생 이름 (교수는 빈 값)
+)
+
 @Serializable
 data class AppData(
     val teams: List<Team> = emptyList(),
@@ -127,6 +134,7 @@ data class AppData(
     val courses: List<Course> = emptyList(),
     val milestones: List<Milestone> = emptyList(),
     val submissions: List<Submission> = emptyList(),
+    val recentLogins: List<RecentLogin> = emptyList(),
     val apiKey: String = "",
     val themeMode: String = "system",   // system | light | dark
     val accentColor: String = "indigo"

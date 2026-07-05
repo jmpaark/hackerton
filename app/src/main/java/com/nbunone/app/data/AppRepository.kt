@@ -31,7 +31,13 @@ object AppRepository {
             initialized = true
             val app = context.applicationContext
             file = File(app.filesDir, "nbunone.json")
-            // Keystore/디스크 접근은 느릴 수 있으므로 메인 스레드를 블록하지 않는다 (ANR 방지)
+            // 저장 데이터(JSON)는 크기가 작아 동기로 즉시 로드한다.
+            // → 콜드스타트 직후의 쓰기/시드로드가 지연된 파일 로드에 덮어써지는 레이스를 원천 차단
+            val loaded = if (file.exists()) {
+                runCatching { json.decodeFromString<AppData>(file.readText()) }.getOrNull() ?: AppData()
+            } else AppData()
+            _data.value = loaded
+            // 키스토어(암호화 저장소)만 느리므로 백그라운드에서 API 키를 불러온다 (ANR 방지)
             diskExecutor.execute {
                 securePrefs = runCatching {
                     val masterKey = MasterKey.Builder(app)
@@ -48,10 +54,8 @@ object AppRepository {
                     // 키스토어 미지원 기기 폴백
                     app.getSharedPreferences("nbunone_secure_fallback", Context.MODE_PRIVATE)
                 }
-                val loaded = if (file.exists()) {
-                    runCatching { json.decodeFromString<AppData>(file.readText()) }.getOrNull() ?: AppData()
-                } else AppData()
-                _data.value = loaded.copy(apiKey = securePrefs?.getString(KEY_API, "") ?: "")
+                val key = securePrefs?.getString(KEY_API, "") ?: ""
+                if (key.isNotEmpty()) _data.value = _data.value.copy(apiKey = key)
             }
         }
     }
@@ -180,8 +184,23 @@ object AppRepository {
     }
 
     fun loadSeedData() = update { old ->
-        Seed.build().copy(apiKey = old.apiKey, themeMode = old.themeMode, accentColor = old.accentColor)
+        Seed.build().copy(
+            apiKey = old.apiKey, themeMode = old.themeMode,
+            accentColor = old.accentColor, recentLogins = old.recentLogins
+        )
     }
 
-    fun clearAll() = update { AppData(apiKey = it.apiKey, themeMode = it.themeMode, accentColor = it.accentColor) }
+    fun clearAll() = update {
+        AppData(
+            apiKey = it.apiKey, themeMode = it.themeMode,
+            accentColor = it.accentColor, recentLogins = it.recentLogins
+        )
+    }
+
+    /** 간편 로그인용 최근 로그인 기록 (역할+이름, 중복 제거, 최근 4개) */
+    fun pushRecentLogin(role: String, name: String) = update { d ->
+        val entry = RecentLogin(role, name.trim())
+        val deduped = d.recentLogins.filterNot { it.role == role && it.name == name.trim() }
+        d.copy(recentLogins = (listOf(entry) + deduped).take(4))
+    }
 }
