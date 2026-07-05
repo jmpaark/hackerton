@@ -21,7 +21,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -167,6 +169,14 @@ fun CourseDetailScreen(
     var showAdd by remember { mutableStateOf(false) }
     var newTitle by remember { mutableStateOf("") }
     var newDue by remember { mutableStateOf(today.plusDays(14).toString()) }
+    var editingCourse by remember { mutableStateOf(false) }
+    var cName by remember(courseId) { mutableStateOf(course.name) }
+    var cSem by remember(courseId) { mutableStateOf(course.semester) }
+    var cType by remember(courseId) { mutableStateOf(course.type) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    var editMsId by remember { mutableStateOf<String?>(null) }
+    var emTitle by remember { mutableStateOf("") }
+    var emDue by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -262,23 +272,56 @@ fun CourseDetailScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            Modifier.size(26.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("${i + 1}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Column(Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                Modifier.size(26.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("${i + 1}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(m.title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                Text(
+                                    "마감 ${m.dueDate} (${dDayLabel(m.dueDate, today)}) · 제출 $submitted/${teams.size}팀",
+                                    fontSize = 12.sp, color = Slate
+                                )
+                            }
+                            IconButton(onClick = {
+                                if (editMsId == m.id) editMsId = null
+                                else { editMsId = m.id; emTitle = m.title; emDue = m.dueDate }
+                            }) {
+                                Icon(Icons.Default.Edit, contentDescription = "수정", tint = Slate, modifier = Modifier.size(18.dp))
+                            }
+                            IconButton(onClick = { AppRepository.deleteMilestone(m.id) }) {
+                                Icon(Icons.Default.Delete, contentDescription = "삭제", tint = Slate, modifier = Modifier.size(18.dp))
+                            }
                         }
-                        Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(m.title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                            Text(
-                                "마감 ${m.dueDate} (${dDayLabel(m.dueDate, today)}) · 제출 $submitted/${teams.size}팀",
-                                fontSize = 12.sp, color = Slate
+                        if (editMsId == m.id) {
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = emTitle, onValueChange = { emTitle = it },
+                                label = { Text("마일스톤 제목") }, singleLine = true, modifier = Modifier.fillMaxWidth()
                             )
-                        }
-                        IconButton(onClick = { AppRepository.deleteMilestone(m.id) }) {
-                            Icon(Icons.Default.Delete, contentDescription = "삭제", tint = Slate, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.height(6.dp))
+                            OutlinedTextField(
+                                value = emDue, onValueChange = { emDue = it },
+                                label = { Text("마감일 (yyyy-MM-dd)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                                isError = parseDateOrNull(emDue) == null
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = {
+                                        AppRepository.updateMilestone(m.copy(title = emTitle.trim(), dueDate = emDue.trim()))
+                                        editMsId = null
+                                    },
+                                    enabled = emTitle.isNotBlank() && parseDateOrNull(emDue) != null,
+                                    modifier = Modifier.weight(1f)
+                                ) { Text("저장") }
+                                OutlinedButton(onClick = { editMsId = null }, modifier = Modifier.weight(1f)) { Text("취소") }
+                            }
                         }
                     }
                 }
@@ -314,6 +357,73 @@ fun CourseDetailScreen(
             } else {
                 OutlinedButton(onClick = { showAdd = true }, modifier = Modifier.fillMaxWidth()) {
                     Text("+ 마일스톤 추가")
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+            Text("과목 관리", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            if (editingCourse) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = cName, onValueChange = { cName = it },
+                            label = { Text("과목명") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = cSem, onValueChange = { cSem = it },
+                            label = { Text("학기") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+                        )
+                        Row(
+                            Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            COURSE_TYPES.forEach { t ->
+                                FilterChip(selected = cType == t, onClick = { cType = t }, label = { Text(t, fontSize = 12.sp) })
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = {
+                                    AppRepository.updateCourse(course.copy(name = cName.trim(), semester = cSem.trim(), type = cType))
+                                    editingCourse = false
+                                },
+                                enabled = cName.isNotBlank(), modifier = Modifier.weight(1f)
+                            ) { Text("저장") }
+                            OutlinedButton(
+                                onClick = { editingCourse = false; cName = course.name; cSem = course.semester; cType = course.type },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("취소") }
+                        }
+                    }
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { editingCourse = true }, modifier = Modifier.weight(1f)) { Text("과목 정보 수정") }
+                    OutlinedButton(
+                        onClick = { confirmDelete = true }, modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Red)
+                    ) { Text("과목 삭제") }
+                }
+            }
+            if (confirmDelete) {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "이 과목을 삭제할까요? 마일스톤과 제출 기록도 함께 삭제됩니다.",
+                            fontSize = 13.sp, color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { AppRepository.deleteCourse(courseId); onBack() },
+                                colors = ButtonDefaults.buttonColors(containerColor = Red),
+                                modifier = Modifier.weight(1f)
+                            ) { Text("삭제") }
+                            OutlinedButton(onClick = { confirmDelete = false }, modifier = Modifier.weight(1f)) { Text("취소") }
+                        }
+                    }
                 }
             }
             Spacer(Modifier.height(8.dp))

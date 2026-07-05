@@ -47,7 +47,7 @@ class AppViewModel : ViewModel() {
     }
 
     fun login(user: CurrentUser) { currentUser = user }
-    fun logout() { currentUser = null }
+    fun logout() { AppRepository.exitDemo(); currentUser = null }
 
     fun myTeams(): List<Team> {
         val user = currentUser as? CurrentUser.Student ?: return emptyList()

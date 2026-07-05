@@ -21,6 +21,10 @@ object AppRepository {
     private val diskExecutor = Executors.newSingleThreadExecutor()
     @Volatile private var initialized = false
 
+    // 데모 세션 — 켜져 있으면 디스크에 저장하지 않는다(실제 데이터 오염 방지)
+    @Volatile private var demoModeFlag = false
+    val isDemo: Boolean get() = demoModeFlag
+
     private val _data = MutableStateFlow(AppData())
     val data: StateFlow<AppData> = _data
 
@@ -64,6 +68,7 @@ object AppRepository {
     private fun update(transform: (AppData) -> AppData) {
         val next = transform(_data.value)
         _data.value = next
+        if (demoModeFlag) return // 데모 세션은 디스크에 저장하지 않음
         val toPersist = next.copy(apiKey = "") // API 키는 JSON에 저장하지 않음
         diskExecutor.execute {
             runCatching {
@@ -90,6 +95,29 @@ object AppRepository {
         d.copy(teams = d.teams.map {
             if (it.id == teamId) it.copy(members = it.members + member) else it
         })
+    }
+
+    fun removeMember(teamId: String, memberId: String) = update { d ->
+        d.copy(
+            teams = d.teams.map {
+                if (it.id == teamId) it.copy(members = it.members.filterNot { m -> m.id == memberId }) else it
+            },
+            logs = d.logs.filterNot { it.teamId == teamId && it.memberId == memberId },
+            evals = d.evals.filterNot { it.teamId == teamId && (it.evaluatorId == memberId || it.targetId == memberId) },
+            submissions = d.submissions.filterNot { it.teamId == teamId && it.memberId == memberId }
+        )
+    }
+
+    fun deleteTeam(teamId: String) = update { d ->
+        d.copy(
+            teams = d.teams.filterNot { it.id == teamId },
+            logs = d.logs.filterNot { it.teamId == teamId },
+            evals = d.evals.filterNot { it.teamId == teamId },
+            submissions = d.submissions.filterNot { it.teamId == teamId },
+            artifacts = d.artifacts.filterNot { it.teamId == teamId },
+            surveys = d.surveys.filterNot { it.teamId == teamId },
+            reports = d.reports.filterNot { it.teamId == teamId }
+        )
     }
 
     fun addLog(log: ActivityLog) = update { it.copy(logs = it.logs + log) }
@@ -136,7 +164,15 @@ object AppRepository {
         )
     }
 
+    fun updateCourse(course: Course) = update { d ->
+        d.copy(courses = d.courses.map { if (it.id == course.id) course else it })
+    }
+
     fun addMilestone(milestone: Milestone) = update { it.copy(milestones = it.milestones + milestone) }
+
+    fun updateMilestone(milestone: Milestone) = update { d ->
+        d.copy(milestones = d.milestones.map { if (it.id == milestone.id) milestone else it })
+    }
 
     fun deleteMilestone(milestoneId: String) = update { d ->
         d.copy(
@@ -188,6 +224,28 @@ object AppRepository {
             apiKey = old.apiKey, themeMode = old.themeMode,
             accentColor = old.accentColor, recentLogins = old.recentLogins
         )
+    }
+
+    /** 데모 둘러보기 시작 — 시드 데이터를 메모리에만 올리고 저장하지 않는다.
+     *  실제(교수 개설 과목 등) 데이터는 디스크에 그대로 보존되고, 종료/재실행 시 복원된다. */
+    fun enterDemo() {
+        val cur = _data.value
+        demoModeFlag = true
+        _data.value = Seed.build().copy(
+            apiKey = cur.apiKey, themeMode = cur.themeMode,
+            accentColor = cur.accentColor, recentLogins = cur.recentLogins
+        )
+    }
+
+    /** 데모 종료 — 디스크의 실제 데이터를 다시 불러온다. (일반 로그인·로그아웃 시 호출) */
+    fun exitDemo() {
+        if (!demoModeFlag) return
+        demoModeFlag = false
+        val cur = _data.value
+        val loaded = if (::file.isInitialized && file.exists()) {
+            runCatching { json.decodeFromString<AppData>(file.readText()) }.getOrNull() ?: AppData()
+        } else AppData()
+        _data.value = loaded.copy(apiKey = cur.apiKey)
     }
 
     fun clearAll() = update {

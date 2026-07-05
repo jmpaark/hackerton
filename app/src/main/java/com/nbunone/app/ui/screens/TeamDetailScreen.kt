@@ -135,7 +135,7 @@ fun TeamDetailScreen(vm: AppViewModel, data: AppData, teamId: String, initialTab
                 }
             }
             when (tab) {
-                0 -> OverviewTab(team = team, data = data, myMemberId = myMemberId, onGoToTab = { tab = it })
+                0 -> OverviewTab(team = team, data = data, myMemberId = myMemberId, onGoToTab = { tab = it }, onBack = onBack)
                 1 -> MilestonesTab(team = team, data = data, myMemberId = myMemberId)
                 2 -> LogsTab(team = team, data = data, myMemberId = myMemberId, snackbar = snackbar)
                 3 -> EvalTab(team = team, data = data, myMemberId = myMemberId, snackbar = snackbar)
@@ -146,7 +146,7 @@ fun TeamDetailScreen(vm: AppViewModel, data: AppData, teamId: String, initialTab
 }
 
 @Composable
-private fun OverviewTab(team: Team, data: AppData, myMemberId: String?, onGoToTab: (Int) -> Unit) {
+private fun OverviewTab(team: Team, data: AppData, myMemberId: String?, onGoToTab: (Int) -> Unit, onBack: () -> Unit) {
     val insights = computeInsights(team, data.logs, data.evals)
     var github by remember(team.id) { mutableStateOf(team.githubUrl) }
     var showAddMember by remember { mutableStateOf(false) }
@@ -154,6 +154,10 @@ private fun OverviewTab(team: Team, data: AppData, myMemberId: String?, onGoToTa
     var newRole by remember { mutableStateOf("") }
     var showGithub by remember { mutableStateOf(false) }
     var showSurvey by remember { mutableStateOf(false) }
+    var editingTeam by remember { mutableStateOf(false) }
+    var tName by remember(team.id) { mutableStateOf(team.name) }
+    var tProject by remember(team.id) { mutableStateOf(team.projectName) }
+    var confirmDeleteTeam by remember { mutableStateOf(false) }
 
     // 다음 할 일 계산
     val myLogCount = if (myMemberId != null) data.logs.count { it.teamId == team.id && it.memberId == myMemberId } else 0
@@ -220,6 +224,12 @@ private fun OverviewTab(team: Team, data: AppData, myMemberId: String?, onGoToTa
                         }
                         if (m.responsibilities.isNotBlank()) {
                             Text(m.responsibilities, fontSize = 12.sp, color = Slate)
+                        }
+                    }
+                    // 팀원 삭제 (본인 제외, 팀원만 가능)
+                    if (myMemberId != null && m.id != myMemberId) {
+                        IconButton(onClick = { AppRepository.removeMember(team.id, m.id) }) {
+                            Icon(Icons.Default.Delete, contentDescription = "팀원 삭제", tint = Slate, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -330,6 +340,68 @@ private fun OverviewTab(team: Team, data: AppData, myMemberId: String?, onGoToTa
         ) { showSurvey = !showSurvey }
         if (showSurvey) {
             SurveySection(team = team, data = data, myMemberId = myMemberId)
+        }
+
+        // 팀 관리 (팀원만 가능) — 이름/프로젝트명 수정 · 팀 삭제
+        if (myMemberId != null) {
+            Spacer(Modifier.height(4.dp))
+            Text("팀 관리", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            if (editingTeam) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = tName, onValueChange = { tName = it },
+                            label = { Text("팀 이름") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = tProject, onValueChange = { tProject = it },
+                            label = { Text("프로젝트명") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = {
+                                    AppRepository.updateTeam(team.copy(name = tName.trim(), projectName = tProject.trim()))
+                                    editingTeam = false
+                                },
+                                enabled = tName.isNotBlank(), modifier = Modifier.weight(1f)
+                            ) { Text("저장") }
+                            OutlinedButton(
+                                onClick = { editingTeam = false; tName = team.name; tProject = team.projectName },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("취소") }
+                        }
+                    }
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { editingTeam = true }, modifier = Modifier.weight(1f)) { Text("팀 정보 수정") }
+                    OutlinedButton(
+                        onClick = { confirmDeleteTeam = true }, modifier = Modifier.weight(1f),
+                        colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = Red)
+                    ) { Text("팀 삭제") }
+                }
+            }
+            if (confirmDeleteTeam) {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "이 팀을 삭제할까요? 활동·평가·산출물 등 모든 기록이 함께 삭제됩니다.",
+                            fontSize = 13.sp, color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { AppRepository.deleteTeam(team.id); onBack() },
+                                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Red),
+                                modifier = Modifier.weight(1f)
+                            ) { Text("삭제") }
+                            OutlinedButton(onClick = { confirmDeleteTeam = false }, modifier = Modifier.weight(1f)) { Text("취소") }
+                        }
+                    }
+                }
+            }
         }
         Spacer(Modifier.height(8.dp))
     }

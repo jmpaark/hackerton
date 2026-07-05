@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,11 +15,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -38,9 +37,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nbunone.app.AppViewModel
@@ -55,32 +55,30 @@ fun LoginScreen(vm: AppViewModel, data: AppData, onLoggedIn: (isProfessor: Boole
     var role by remember { mutableStateOf("student") }
     val primary = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
+    val canLogin = role == "professor" || name.isNotBlank()
 
-    // 실제 로그인 — 최근 로그인에 기록 후 진입
-    val enter: (Boolean, String) -> Unit = { isProfessor, studentName ->
-        if (isProfessor) {
-            AppRepository.pushRecentLogin("professor", "")
-            vm.login(CurrentUser.Professor)
-            onLoggedIn(true)
+    // 실제 로그인 — 데모 세션이면 종료(실제 데이터 복원) 후 진입
+    val enter: () -> Unit = {
+        AppRepository.exitDemo()
+        if (role == "professor") {
+            vm.login(CurrentUser.Professor); onLoggedIn(true)
         } else {
-            val n = studentName.trim()
-            AppRepository.pushRecentLogin("student", n)
-            vm.login(CurrentUser.Student(n))
-            onLoggedIn(false)
+            vm.login(CurrentUser.Student(name.trim())); onLoggedIn(false)
         }
     }
-
-    // 데모 데이터로 둘러보기 (심사·시연용 샘플)
+    val socialLogin: (String) -> Unit = { provider ->
+        Toast.makeText(context, "$provider 계정으로 로그인했어요", Toast.LENGTH_SHORT).show()
+        enter()
+    }
+    // 데모 둘러보기 — 시드 데이터를 세션에만 로드(저장 안 됨)
     val loadDemo: () -> Unit = {
-        AppRepository.loadSeedData()
+        AppRepository.enterDemo()
         if (role == "professor") {
-            Toast.makeText(context, "데모 · 교수님으로 입장합니다", Toast.LENGTH_SHORT).show()
-            vm.login(CurrentUser.Professor)
-            onLoggedIn(true)
+            Toast.makeText(context, "데모 · 교수님으로 둘러보기", Toast.LENGTH_SHORT).show()
+            vm.login(CurrentUser.Professor); onLoggedIn(true)
         } else {
-            Toast.makeText(context, "데모 · 소이(팀장)으로 입장합니다", Toast.LENGTH_SHORT).show()
-            vm.login(CurrentUser.Student("소이"))
-            onLoggedIn(false)
+            Toast.makeText(context, "데모 · 소이(팀장)으로 둘러보기", Toast.LENGTH_SHORT).show()
+            vm.login(CurrentUser.Student("소이")); onLoggedIn(false)
         }
     }
 
@@ -103,55 +101,25 @@ fun LoginScreen(vm: AppViewModel, data: AppData, onLoggedIn: (isProfessor: Boole
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // 로고 — 길게 누르면 데모 데이터 로드 (숨김 제스처)
+            // 로고 — 길게 누르면 데모 둘러보기 (숨김 제스처)
             Box(
                 Modifier
-                    .size(88.dp)
-                    .shadow(16.dp, RoundedCornerShape(26.dp), spotColor = primary)
+                    .size(84.dp)
+                    .shadow(16.dp, RoundedCornerShape(24.dp), spotColor = primary)
                     .background(
                         Brush.linearGradient(listOf(primary, primary.copy(alpha = 0.75f))),
-                        RoundedCornerShape(26.dp)
+                        RoundedCornerShape(24.dp)
                     )
                     .pointerInput(role) {
                         detectTapGestures(onLongPress = { loadDemo() })
                     },
                 contentAlignment = Alignment.Center
             ) {
-                Text("1/N", color = MaterialTheme.colorScheme.onPrimary, fontSize = 28.sp, fontWeight = FontWeight.Black)
+                Text("1/N", color = MaterialTheme.colorScheme.onPrimary, fontSize = 26.sp, fontWeight = FontWeight.Black)
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
             Text("N분의1", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = (-0.5).sp)
-            Spacer(Modifier.height(32.dp))
-
-            // ── 간편 로그인 (최근 로그인 기록이 있을 때) ──
-            if (data.recentLogins.isNotEmpty()) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("간편 로그인", fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                    Text("탭 한 번으로 계속하기", fontSize = 11.sp, color = Slate)
-                }
-                Spacer(Modifier.height(10.dp))
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    data.recentLogins.forEach { rl ->
-                        val isProf = rl.role == "professor"
-                        val label = if (isProf) "교수님" else rl.name.ifBlank { "학생" }
-                        val emoji = if (isProf) "👨‍🏫" else "🎓"
-                        AssistChip(
-                            onClick = { enter(isProf, rl.name) },
-                            label = { Text("$emoji  $label", fontSize = 13.sp) },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            )
-                        )
-                    }
-                }
-                Spacer(Modifier.height(22.dp))
-                Text("또는 새로 시작", fontSize = 11.sp, color = Slate)
-                Spacer(Modifier.height(12.dp))
-            }
+            Spacer(Modifier.height(30.dp))
 
             // 역할 선택
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -168,7 +136,7 @@ fun LoginScreen(vm: AppViewModel, data: AppData, onLoggedIn: (isProfessor: Boole
                     modifier = Modifier.weight(1f)
                 ) { role = "professor" }
             }
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
 
             if (role == "student") {
                 OutlinedTextField(
@@ -180,29 +148,59 @@ fun LoginScreen(vm: AppViewModel, data: AppData, onLoggedIn: (isProfessor: Boole
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "카카오·구글로 로그인하고, 팀에서 쓸 이름만 입력하면 시작돼요",
+                    fontSize = 11.sp, color = Slate, modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(14.dp))
+            } else {
+                Spacer(Modifier.height(6.dp))
             }
 
+            // ── 간편 로그인 (카카오 / 구글) ──
             Button(
-                onClick = {
-                    if (role == "professor") enter(true, "")
-                    else if (name.isNotBlank()) enter(false, name)
-                },
-                enabled = role == "professor" || name.isNotBlank(),
-                shape = RoundedCornerShape(16.dp),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                modifier = Modifier.fillMaxWidth().height(54.dp)
+                onClick = { socialLogin("카카오") },
+                enabled = canLogin,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFFEE500),
+                    contentColor = Color(0xFF191600),
+                    disabledContainerColor = Color(0xFFFEE500).copy(alpha = 0.45f),
+                    disabledContentColor = Color(0xFF191600).copy(alpha = 0.5f)
+                ),
+                shape = RoundedCornerShape(14.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp)
             ) {
-                Text("시작하기", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("💬", fontSize = 16.sp)
+                Spacer(Modifier.width(8.dp))
+                Text("카카오로 시작하기", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = { socialLogin("구글") },
+                enabled = canLogin,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp)
+            ) {
+                Text(
+                    "G",
+                    fontSize = 17.sp, fontWeight = FontWeight.Black,
+                    color = if (canLogin) Color(0xFF4285F4) else Slate
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Google로 시작하기", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(18.dp))
+            Text("또는", fontSize = 11.sp, color = Slate)
+            Spacer(Modifier.height(10.dp))
             OutlinedButton(
                 onClick = loadDemo,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth().height(48.dp)
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth().height(46.dp)
             ) {
-                Text("🎬  데모 데이터로 둘러보기 (심사용 샘플)", fontSize = 13.sp)
+                Text("🎬  데모 데이터로 둘러보기 (심사용 샘플)", fontSize = 12.5.sp)
             }
         }
     }
